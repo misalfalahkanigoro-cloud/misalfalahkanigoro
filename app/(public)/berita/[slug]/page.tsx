@@ -54,12 +54,7 @@ const NewsDetail: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
-            <PublicHero
-                title={news.title}
-                subtitle={news.excerpt}
-                fallbackImage={news.thumbnailUrl || 'https://picsum.photos/1200/400'}
-                newsCount={4}
-            />
+            <PublicHero />
 
             <div className="container mx-auto px-4 py-12">
                 <div className="max-w-3xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 md:p-8">
