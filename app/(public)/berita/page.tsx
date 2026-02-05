@@ -65,10 +65,7 @@ const Berita: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
-            <PublicHero
-                title="Kabar Madrasah"
-                subtitle="Ikuti terus perkembangan dan kegiatan terbaru di MIS Al-Falah Kanigoro."
-            />
+            <PublicHero />
 
             <div className="container mx-auto px-4 py-12">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
