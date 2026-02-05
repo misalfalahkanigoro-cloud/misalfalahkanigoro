@@ -1,0 +1,5 @@
+{
+    "Table":  "contact_page",
+    "SupExtra":  "formTitle, heroImageUrl, heroSubtitle, heroTitle, mapEmbedUrl, workHoursWeekday, workHoursWeekend",
+    "SupMissing":  "adminWhatsappId, mapEmbedHtml, whatsappList"
+}
