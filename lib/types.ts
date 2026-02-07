@@ -268,6 +268,11 @@ export interface SiteSettings {
     schoolEmail: string | null;
     schoolWhatsapp: string | null;
     schoolTagline: string | null;
+    faviconUrl?: string | null;
+    metaDescription?: string | null;
+    metaKeywords?: string | null;
+    googleAnalyticsId?: string | null;
+    facebookPixelId?: string | null;
     isActive: boolean;
 }
 
@@ -340,6 +345,53 @@ export interface VisionMissionPage {
     id: string;
     visionText: string;
     missionText: string;
+    isActive: boolean;
+}
+
+export interface Extracurricular {
+    id: string;
+    name: string;
+    description: string;
+    icon?: string | null;
+    imageUrl?: string | null;
+    schedule?: string | null;
+    coachName?: string | null;
+    displayOrder: number;
+    isActive: boolean;
+}
+
+export interface CharacterProgram {
+    id: string;
+    name: string;
+    description: string;
+    icon?: string | null;
+    frequency?: string | null;
+    displayOrder: number;
+    isActive: boolean;
+}
+
+export type SiteBannerPlacement = 'home' | 'all' | 'custom';
+
+export interface SiteBanner {
+    id: string;
+    title: string;
+    description?: string | null;
+    buttonText: string;
+    buttonLink: string;
+    backgroundColor?: string | null;
+    textColor?: string | null;
+    placement: SiteBannerPlacement;
+    displayOrder: number;
+    isActive: boolean;
+}
+
+export interface PageHero {
+    id: string;
+    pageSlug: string;
+    title: string;
+    subtitle?: string | null;
+    imageUrl: string;
+    overlayOpacity?: number | null;
     isActive: boolean;
 }
 

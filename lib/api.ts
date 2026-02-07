@@ -51,6 +51,13 @@ export const api = {
     getSocialMediaLinks: () => fetchAPI('/api/social-media-links'),
     getNavigationMenu: () => fetchAPI('/api/navigation-menu'),
     getFooterLinks: () => fetchAPI('/api/footer-links'),
+    getHeadmasterGreeting: () => fetchOptional('/api/headmaster-greeting'),
+    getExtracurriculars: () => fetchAPI('/api/extracurriculars'),
+    getCharacterPrograms: () => fetchAPI('/api/character-programs'),
+    getSiteBanners: (placement?: string) =>
+        fetchAPI(`/api/site-banners${placement ? `?placement=${encodeURIComponent(placement)}` : ''}`),
+    getPageHero: (slug: string) =>
+        fetchOptional(`/api/page-heroes?slug=${encodeURIComponent(slug)}`),
 
     // Hero Slides
     getHeroSlides: () => fetchAPI('/api/hero-slides'),

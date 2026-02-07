@@ -280,9 +280,9 @@ const Header: React.FC = () => {
                                                 } group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0`}
                                         >
                                             <div className="py-2">
-                                                {entry.items.map((item) => (
+                                                {entry.items.map((item, idx) => (
                                                     <Link
-                                                        key={item.href + item.label}
+                                                        key={`${item.href}-${item.label}-${idx}`}
                                                         href={item.href}
                                                         className={`block px-4 py-2 text-sm transition ${pathname === item.href
                                                                 ? 'bg-green-50 text-primary dark:bg-green-900/30 dark:text-green-400'
@@ -370,9 +370,9 @@ const Header: React.FC = () => {
                                         </button>
                                         {openGroup === entry.label && (
                                             <div className="flex flex-col">
-                                                {entry.items.map((item) => (
+                                                {entry.items.map((item, idx) => (
                                                     <Link
-                                                        key={item.href + item.label}
+                                                        key={`${item.href}-${item.label}-${idx}`}
                                                         href={item.href}
                                                         className={`px-4 py-3 text-sm ${pathname === item.href
                                                                 ? 'bg-green-50 text-primary dark:bg-green-900/30 dark:text-green-400'

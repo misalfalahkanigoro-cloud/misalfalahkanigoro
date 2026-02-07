@@ -62,6 +62,67 @@ create table if not exists highlights (
 );
 create index if not exists highlights_order_idx on highlights ("order");
 
+-- Kesiswaan: Ekstrakurikuler
+create table if not exists extracurriculars (
+  id bigserial primary key,
+  name text not null,
+  description text not null,
+  icon text,
+  imageurl text,
+  schedule text,
+  coachname text,
+  displayorder int default 0,
+  isactive boolean default true,
+  createdat timestamptz not null default now(),
+  updatedat timestamptz not null default now()
+);
+create index if not exists idx_extracurriculars_active on extracurriculars(isactive, displayorder);
+
+-- Kesiswaan: Pembiasaan Karakter
+create table if not exists character_programs (
+  id bigserial primary key,
+  name text not null,
+  description text not null,
+  icon text,
+  frequency text,
+  displayorder int default 0,
+  isactive boolean default true,
+  createdat timestamptz not null default now(),
+  updatedat timestamptz not null default now()
+);
+create index if not exists idx_character_programs_active on character_programs(isactive, displayorder);
+
+-- Banner CTA (site-wide / home)
+create table if not exists site_banners (
+  id bigserial primary key,
+  title text not null,
+  description text,
+  buttontext text not null,
+  buttonlink text not null,
+  backgroundcolor text default '#10b981',
+  textcolor text default '#ffffff',
+  placement text not null check (placement in ('home', 'all', 'custom')),
+  displayorder int default 0,
+  isactive boolean default true,
+  createdat timestamptz not null default now(),
+  updatedat timestamptz not null default now()
+);
+create index if not exists idx_site_banners_active on site_banners(isactive, placement);
+
+-- Hero per halaman
+create table if not exists page_heroes (
+  id bigserial primary key,
+  pageslug text not null unique,
+  title text not null,
+  subtitle text,
+  imageurl text not null,
+  overlayopacity decimal(3,2) default 0.5,
+  isactive boolean default true,
+  createdat timestamptz not null default now(),
+  updatedat timestamptz not null default now()
+);
+create index if not exists idx_page_heroes_slug on page_heroes(pageslug);
+
 create table if not exists teachers (
   id bigserial primary key,
   name text not null,
@@ -102,7 +163,7 @@ create table if not exists content_posts (
   category text,
   "publishedAt" timestamptz,
   "isPublished" boolean not null default true,
-  "isPinned" boolean not null default false,
+  is_pinned boolean not null default false,
   meta jsonb,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
@@ -136,7 +197,7 @@ create table if not exists achievements (
   category text,
   "achievedAt" date,
   "isPublished" boolean not null default true,
-  "isPinned" boolean not null default false,
+  is_pinned boolean not null default false,
   meta jsonb,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
@@ -235,6 +296,14 @@ create table if not exists site_settings (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Tambahan field SEO & tracking
+alter table site_settings 
+add column if not exists favicon_url text,
+add column if not exists meta_description text,
+add column if not exists meta_keywords text,
+add column if not exists google_analytics_id text,
+add column if not exists facebook_pixel_id text;
 
 -- ============================================
 -- TABLE: social_media_links
@@ -352,6 +421,20 @@ create table if not exists vision_mission_page (
   updated_at timestamptz not null default now()
 );
 create index if not exists vision_mission_page_active_idx on vision_mission_page(is_active);
+
+-- Activity logs (opsional)
+create table if not exists admin_activities (
+  id uuid primary key default gen_random_uuid(),
+  admin_id uuid not null references admin_publicweb(id) on delete cascade,
+  action text not null,
+  resource_type text not null,
+  resource_id text,
+  description text,
+  ip_address text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_admin_activities_admin on admin_activities(admin_id, created_at);
+create index if not exists idx_admin_activities_resource on admin_activities(resource_type, resource_id);
 
 -- Content pages
 create table if not exists profile_page (
@@ -474,7 +557,11 @@ for each row execute function set_updated_at();
 create or replace function set_updated_at_snake()
 returns trigger as $$
 begin
-  new.updated_at = now();
+  if (exists (select 1 where 'updated_at' = any (select column_name from information_schema.columns where table_name = TG_TABLE_NAME))) then
+    new.updated_at = now();
+  elsif (exists (select 1 where 'updatedat' = any (select column_name from information_schema.columns where table_name = TG_TABLE_NAME))) then
+    new.updatedat = now();
+  end if;
   return new;
 end;
 $$ language plpgsql;
@@ -505,6 +592,18 @@ before update on history_timeline_items
 for each row execute function set_updated_at_snake();
 create trigger vision_mission_page_updated_at
 before update on vision_mission_page
+for each row execute function set_updated_at_snake();
+create trigger extracurriculars_updated_at
+before update on extracurriculars
+for each row execute function set_updated_at_snake();
+create trigger character_programs_updated_at
+before update on character_programs
+for each row execute function set_updated_at_snake();
+create trigger site_banners_updated_at
+before update on site_banners
+for each row execute function set_updated_at_snake();
+create trigger page_heroes_updated_at
+before update on page_heroes
 for each row execute function set_updated_at_snake();
 create trigger profile_page_updated_at before update on profile_page
 for each row execute function set_updated_at();
@@ -544,6 +643,11 @@ alter table headmaster_greeting enable row level security;
 alter table history_page enable row level security;
 alter table history_timeline_items enable row level security;
 alter table vision_mission_page enable row level security;
+alter table extracurriculars enable row level security;
+alter table character_programs enable row level security;
+alter table site_banners enable row level security;
+alter table page_heroes enable row level security;
+alter table admin_activities enable row level security;
 alter table profile_page enable row level security;
 alter table profile_mission_items enable row level security;
 alter table profile_identity_items enable row level security;
@@ -590,6 +694,11 @@ create policy "anon_read_academic_page" on academic_page for select to anon usin
 create policy "anon_read_academic_subjects" on academic_subjects for select to anon using (true);
 create policy "anon_read_academic_programs" on academic_programs for select to anon using (true);
 create policy "anon_read_contact_page" on contact_page for select to anon using (true);
+
+create policy "anon_read_extracurriculars" on extracurriculars for select to anon using (isactive = true);
+create policy "anon_read_character_programs" on character_programs for select to anon using (isactive = true);
+create policy "anon_read_site_banners" on site_banners for select to anon using (isactive = true);
+create policy "anon_read_page_heroes" on page_heroes for select to anon using (isactive = true);
 
 -- Policies: public web settings
 create policy "Anyone can read site settings"
@@ -752,6 +861,56 @@ using (
   )
 );
 
+create policy "Only admin can modify extracurriculars"
+on extracurriculars
+for all
+using (
+  exists (
+    select 1 from admin_publicweb
+    where id = auth.uid()
+  )
+);
+
+create policy "Only admin can modify character programs"
+on character_programs
+for all
+using (
+  exists (
+    select 1 from admin_publicweb
+    where id = auth.uid()
+  )
+);
+
+create policy "Only admin can modify site banners"
+on site_banners
+for all
+using (
+  exists (
+    select 1 from admin_publicweb
+    where id = auth.uid()
+  )
+);
+
+create policy "Only admin can modify page heroes"
+on page_heroes
+for all
+using (
+  exists (
+    select 1 from admin_publicweb
+    where id = auth.uid()
+  )
+);
+
+create policy "Only admin can read activity logs"
+on admin_activities
+for select
+using (
+  exists (
+    select 1 from admin_publicweb
+    where id = auth.uid()
+  )
+);
+
 -- Seed dummy admin accounts
 -- Note: bcryptjs default menggunakan 10 rounds
 insert into admin_publicweb (username, password_hash, user_role, full_name, email, phone)
@@ -800,12 +959,53 @@ values (
   'Mencetak generasi cerdas, berakhlak mulia, dan berwawasan global dengan landasan nilai-nilai Islami yang kuat.'
 );
 
+update site_settings
+set
+  favicon_url = '/favicon.ico',
+  meta_description = 'Website resmi MI Al-Falah Kanigoro - Madrasah Ibtidaiyah swasta berkualitas di Blitar, Jawa Timur',
+  meta_keywords = 'madrasah, MI, Al-Falah, Kanigoro, Blitar, pendidikan Islam'
+where id = (select id from site_settings limit 1);
+
 -- Seed data sosial media
 insert into social_media_links (platform, url, display_order)
 values 
   ('facebook', 'https://facebook.com/misalfalah', 1),
   ('instagram', 'https://instagram.com/misalfalah', 2),
   ('youtube', 'https://youtube.com/@misalfalah', 3);
+
+-- Seed extracurriculars
+insert into extracurriculars (name, description, icon, schedule, coachname, displayorder)
+values 
+  ('Pramuka', 'Melatih kepemimpinan dan kemandirian siswa', 'Tent', 'Jumat, 14:00-16:00', 'Ustadz Ahmad', 1),
+  ('Tahfidz', 'Menghafal Al-Quran dengan metode tilawati', 'BookMarked', 'Senin-Kamis, 07:00-08:00', 'Ustadzah Fatimah', 2),
+  ('Seni Kaligrafi', 'Mengasah kreativitas seni kaligrafi Arab', 'Paintbrush', 'Rabu, 15:00-16:30', 'Ustadz Bambang', 3),
+  ('Futsal', 'Olahraga futsal untuk kesehatan dan teamwork', 'Trophy', 'Sabtu, 08:00-10:00', 'Coach Dedi', 4)
+on conflict do nothing;
+
+-- Seed character programs
+insert into character_programs (name, description, icon, frequency, displayorder)
+values 
+  ('Sholat Dhuha Berjamaah', 'Pembiasaan sholat dhuha setiap pagi', 'Sunrise', 'Setiap Hari', 1),
+  ('Infaq Jumat', 'Berbagi kepada sesama setiap Jumat', 'Heart', 'Setiap Jumat', 2),
+  ('Tahsin & Tartil', 'Pembelajaran baca Al-Quran yang benar', 'BookOpen', '3x Seminggu', 3),
+  ('Budaya 5S', 'Senyum, Salam, Sapa, Sopan, Santun', 'SmilePlus', 'Setiap Hari', 4)
+on conflict do nothing;
+
+-- Seed site banners
+insert into site_banners (title, description, buttontext, buttonlink, placement, displayorder)
+values 
+  ('PPDB 2026 Dibuka!', 'Daftarkan putra-putri Anda sekarang. Kuota terbatas!', 'Daftar Sekarang', '/ppdb', 'home', 1)
+on conflict do nothing;
+
+-- Seed page heroes
+insert into page_heroes (pageslug, title, subtitle, imageurl)
+values 
+  ('kelulusan', 'Cek Kelulusan', 'Informasi kelulusan siswa tahun ajaran 2025/2026', 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1920'),
+  ('kontak', 'Hubungi Kami', 'Kami siap melayani pertanyaan Anda', 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1920')
+on conflict (pageslug) do update set
+  title = excluded.title,
+  subtitle = excluded.subtitle,
+  imageurl = excluded.imageurl;
 
 -- Seed data menu navigasi (updated)
 insert into navigation_menu (id, label, href, parent_id, display_order, is_active, icon, created_at, updated_at)
