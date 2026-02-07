@@ -8,18 +8,13 @@ export async function GET(request: NextRequest) {
         const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
         const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') || '10', 10)));
 
-        const whereClause = {
-            isPublished: true,
-            ...(category ? { category } : {}),
-        };
-
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
 
         let listQuery = supabaseAdmin()
             .from('news')
             .select('*', { count: 'exact' })
-            .eq('is_published', true)
+            .eq('isPublished', true)
             .order('date', { ascending: false })
             .range(from, to);
 
@@ -35,7 +30,7 @@ export async function GET(request: NextRequest) {
         const { data: categoriesData, error: categoriesError } = await supabaseAdmin()
             .from('news')
             .select('category')
-            .eq('is_published', true);
+            .eq('isPublished', true);
 
         if (categoriesError) {
             throw categoriesError;

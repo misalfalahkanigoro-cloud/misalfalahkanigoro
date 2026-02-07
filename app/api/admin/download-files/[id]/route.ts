@@ -1,0 +1,53 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params;
+        const payload = await request.json();
+        const updatePayload = {
+            title: payload.title?.trim() || '',
+            category: payload.category?.trim() || 'Umum',
+            date: payload.date || new Date().toISOString(),
+            size: payload.size?.trim() || '',
+            fileType: payload.fileType || 'PDF',
+            fileUrl: payload.fileUrl || '',
+            isActive: payload.isActive ?? true,
+        };
+
+        const { data, error } = await supabaseAdmin()
+            .from('download_files')
+            .update(updatePayload)
+            .eq('id', id)
+            .select('*')
+            .single();
+
+        if (error) {
+            throw error;
+        }
+
+        return NextResponse.json(data);
+    } catch (error) {
+        console.error('Admin download files update error:', error);
+        return NextResponse.json({ error: 'Failed to update download file' }, { status: 500 });
+    }
+}
+
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params;
+        const { error } = await supabaseAdmin()
+            .from('download_files')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            throw error;
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Admin download files delete error:', error);
+        return NextResponse.json({ error: 'Failed to delete download file' }, { status: 500 });
+    }
+}

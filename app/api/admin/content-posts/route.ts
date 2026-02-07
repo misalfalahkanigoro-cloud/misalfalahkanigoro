@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         let query = supabaseAdmin()
             .from('content_posts')
             .select('*')
-            .order('isPinned', { ascending: false })
+            .order('is_pinned', { ascending: false })
             .order('publishedAt', { ascending: false })
             .order('createdAt', { ascending: false });
 
@@ -37,7 +37,12 @@ export async function GET(request: NextRequest) {
             throw error;
         }
 
-        return NextResponse.json(data || []);
+        const mapped = (data || []).map((row) => ({
+            ...row,
+            isPinned: row.is_pinned,
+        }));
+
+        return NextResponse.json(mapped);
     } catch (error) {
         console.error('Admin content posts error:', error);
         return NextResponse.json({ error: 'Failed to fetch content posts' }, { status: 500 });
@@ -72,7 +77,7 @@ export async function POST(request: Request) {
             category: postInput.category || null,
             publishedAt: postInput.publishedAt || null,
             isPublished: postInput.isPublished ?? true,
-            isPinned: postInput.isPinned ?? false,
+            is_pinned: postInput.isPinned ?? false,
             meta: metaValue,
         };
 
@@ -148,7 +153,7 @@ export async function PUT(request: Request) {
             category: postInput.category || null,
             publishedAt: postInput.publishedAt || null,
             isPublished: postInput.isPublished ?? true,
-            isPinned: postInput.isPinned ?? false,
+            is_pinned: postInput.isPinned ?? false,
             meta: metaValue,
         };
 

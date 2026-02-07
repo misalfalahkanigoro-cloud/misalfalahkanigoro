@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Calendar, CheckCircle, Shield, Award, Heart, Star, BookOpen, Users, Camera } from 'lucide-react';
 import PublicHero from '@/components/PublicHero';
 import { api } from '@/lib/api';
-import type { Highlight, NewsItem, Activity, NewsListResponse } from '@/lib/types';
+import type { Highlight, NewsItem, Activity, NewsListResponse, HeadmasterGreeting, SiteBanner } from '@/lib/types';
 
 // Icon mapping for highlights
 const iconMap: Record<string, React.ReactNode> = {
@@ -18,6 +18,8 @@ const Home: React.FC = () => {
     const [highlights, setHighlights] = useState<Highlight[]>([]);
     const [news, setNews] = useState<NewsItem[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
+    const [greeting, setGreeting] = useState<HeadmasterGreeting | null>(null);
+    const [banner, setBanner] = useState<SiteBanner | null>(null);
     const [schoolName] = useState('MIS Al-Falah Kanigoro');
     const [loading, setLoading] = useState(true);
 
@@ -25,15 +27,20 @@ const Home: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [highlightsData, newsData, activitiesData] = await Promise.all([
+                const [highlightsData, newsData, activitiesData, greetingData, bannersData] = await Promise.all([
                     api.getHighlights(),
                     api.getNews({ page: 1, pageSize: 3 }),
                     api.getActivities(),
+                    api.getHeadmasterGreeting(),
+                    api.getSiteBanners('home'),
                 ]);
 
                 setHighlights(highlightsData as Highlight[]);
                 setNews(((newsData as NewsListResponse).items || []));
                 setActivities(activitiesData as Activity[]);
+                setGreeting((greetingData as HeadmasterGreeting) || null);
+                const banners = bannersData as SiteBanner[];
+                setBanner(banners && banners.length ? banners[0] : null);
             } catch (error) {
                 console.error('Error fetching homepage data:', error);
             } finally {
@@ -108,26 +115,34 @@ const Home: React.FC = () => {
                             <div className="relative">
                                 <div className="absolute inset-0 bg-primary/10 dark:bg-primary/20 transform translate-x-4 translate-y-4 rounded-xl"></div>
                                 <img
-                                    src="https://picsum.photos/id/1005/600/800"
-                                    alt="Kepala Madrasah"
+                                    src={greeting?.photoUrl || 'https://picsum.photos/id/1005/600/800'}
+                                    alt={greeting?.headmasterName || 'Kepala Madrasah'}
                                     className="rounded-xl shadow-lg relative z-10 w-full object-cover aspect-[3/4]"
                                 />
                             </div>
                         </div>
                         <div className="w-full md:w-2/3">
                             <h4 className="text-primary dark:text-green-400 font-bold uppercase tracking-wider mb-2">Sambutan Kepala Madrasah</h4>
-                            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">Mewujudkan Generasi Islami yang Kompetitif</h2>
+                            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">{greeting?.subtitle || 'Mewujudkan Generasi Islami yang Kompetitif'}</h2>
                             <div className="space-y-4 text-gray-600 dark:text-gray-300 leading-relaxed text-lg">
-                                <p>
-                                    "Assalamu'alaikum Warahmatullahi Wabarakatuh. Puji syukur kita panjatkan ke hadirat Allah SWT. {schoolName} hadir sebagai lembaga pendidikan yang berkomitmen mencetak generasi yang tidak hanya cerdas secara intelektual, namun juga matang secara spiritual."
-                                </p>
-                                <p>
-                                    "Kami memadukan kurikulum nasional dengan nilai-nilai pesantren untuk membentuk karakter siswa yang berakhlak karimah, mandiri, dan siap menghadapi tantangan zaman."
-                                </p>
+                                {greeting?.contentText ? (
+                                    greeting.contentText.split('\n').filter(Boolean).slice(0, 2).map((line, idx) => (
+                                        <p key={idx}>{line}</p>
+                                    ))
+                                ) : (
+                                    <>
+                                        <p>
+                                            "Assalamu'alaikum Warahmatullahi Wabarakatuh. Puji syukur kita panjatkan ke hadirat Allah SWT. {schoolName} hadir sebagai lembaga pendidikan yang berkomitmen mencetak generasi yang tidak hanya cerdas secara intelektual, namun juga matang secara spiritual."
+                                        </p>
+                                        <p>
+                                            "Kami memadukan kurikulum nasional dengan nilai-nilai pesantren untuk membentuk karakter siswa yang berakhlak karimah, mandiri, dan siap menghadapi tantangan zaman."
+                                        </p>
+                                    </>
+                                )}
                             </div>
                             <div className="mt-8">
-                                <p className="font-bold text-gray-900 dark:text-white">Drs. H. Ahmad Fauzi, M.Pd</p>
-                                <p className="text-gray-500 dark:text-gray-400">Kepala Madrasah</p>
+                                <p className="font-bold text-gray-900 dark:text-white">{greeting?.headmasterName || 'Drs. H. Ahmad Fauzi, M.Pd'}</p>
+                                <p className="text-gray-500 dark:text-gray-400">{greeting?.headmasterTitle || 'Kepala Madrasah'}</p>
                             </div>
                         </div>
                     </div>
@@ -202,21 +217,24 @@ const Home: React.FC = () => {
             </section>
 
             {/* PPDB CTA Section */}
-            <section className="py-20 bg-primary dark:bg-green-800 text-white relative overflow-hidden transition-colors duration-200">
+            <section
+                className="py-20 text-white relative overflow-hidden transition-colors duration-200 bg-primary dark:bg-green-800"
+                style={{ backgroundColor: banner?.backgroundColor || undefined }}
+            >
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-white/5"></div>
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-60 h-60 rounded-full bg-white/5"></div>
 
-                <div className="container mx-auto px-4 text-center relative z-10">
-                    <h2 className="text-3xl md:text-5xl font-bold mb-6">Penerimaan Peserta Didik Baru</h2>
-                    <p className="text-green-100 text-lg md:text-xl max-w-2xl mx-auto mb-10">
-                        Bergabunglah bersama keluarga besar {schoolName}. Mari wujudkan generasi Qur'ani yang cerdas dan berakhlak mulia.
+                <div className="container mx-auto px-4 text-center relative z-10" style={{ color: banner?.textColor || undefined }}>
+                    <h2 className="text-3xl md:text-5xl font-bold mb-6">{banner?.title || 'Penerimaan Peserta Didik Baru'}</h2>
+                    <p className="text-green-100 text-lg md:text-xl max-w-2xl mx-auto mb-10" style={{ color: banner?.textColor || undefined }}>
+                        {banner?.description || `Bergabunglah bersama keluarga besar ${schoolName}. Mari wujudkan generasi Qur'ani yang cerdas dan berakhlak mulia.`}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <Link
-                            href="/ppdb"
+                            href={banner?.buttonLink || '/ppdb'}
                             className="px-8 py-4 bg-white text-primary rounded-full font-bold text-lg hover:bg-gray-100 transition shadow-lg"
                         >
-                            Daftar Sekarang
+                            {banner?.buttonText || 'Daftar Sekarang'}
                         </Link>
                         <Link
                             href="/kontak"

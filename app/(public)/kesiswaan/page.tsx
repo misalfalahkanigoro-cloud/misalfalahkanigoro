@@ -1,23 +1,46 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Camera, Music, PenTool, Activity, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Camera, Music, PenTool, Activity, Loader2, Tent, BookMarked, Paintbrush, Trophy, Sunrise, Heart, BookOpen, SmilePlus } from 'lucide-react';
 import SimpleHero from '@/components/SimpleHero';
 import { api } from '@/lib/api';
-import type { Activity as ActivityItem } from '@/lib/types';
+import type { Activity as ActivityItem, CharacterProgram, Extracurricular } from '@/lib/types';
 
 // Helper component for icon
 const ZapIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-zap"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>;
 
+const iconMap: Record<string, React.ReactNode> = {
+    Activity: <Activity size={20} />,
+    Music: <Music size={20} />,
+    PenTool: <PenTool size={20} />,
+    Tent: <Tent size={20} />,
+    BookMarked: <BookMarked size={20} />,
+    Paintbrush: <Paintbrush size={20} />,
+    Trophy: <Trophy size={20} />,
+    Sunrise: <Sunrise size={20} />,
+    Heart: <Heart size={20} />,
+    BookOpen: <BookOpen size={20} />,
+    SmilePlus: <SmilePlus size={20} />,
+    Zap: <ZapIcon />,
+};
+
 const Kesiswaan: React.FC = () => {
     const [activities, setActivities] = useState<ActivityItem[]>([]);
+    const [extracurriculars, setExtracurriculars] = useState<Extracurricular[]>([]);
+    const [characterPrograms, setCharacterPrograms] = useState<CharacterProgram[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchActivities = async () => {
             try {
-                const data = await api.getActivities();
-                setActivities(data as ActivityItem[]);
+                const [activitiesData, extracurricularsData, characterProgramsData] = await Promise.all([
+                    api.getActivities(),
+                    api.getExtracurriculars(),
+                    api.getCharacterPrograms(),
+                ]);
+                setActivities(activitiesData as ActivityItem[]);
+                setExtracurriculars(extracurricularsData as Extracurricular[]);
+                setCharacterPrograms(characterProgramsData as CharacterProgram[]);
             } catch (error) {
                 console.error('Error fetching activities:', error);
             } finally {
@@ -27,6 +50,29 @@ const Kesiswaan: React.FC = () => {
 
         fetchActivities();
     }, []);
+
+    const fallbackExtracurriculars: Extracurricular[] = [
+        { id: 'fallback-1', name: 'Pramuka', description: 'Melatih kepemimpinan dan kemandirian siswa', icon: 'Tent', displayOrder: 1, isActive: true },
+        { id: 'fallback-2', name: 'Drum Band', description: 'Ekspresi seni musik dan kekompakan tim', icon: 'Music', displayOrder: 2, isActive: true },
+        { id: 'fallback-3', name: 'Pencak Silat', description: 'Membangun fisik dan mental yang tangguh', icon: 'Activity', displayOrder: 3, isActive: true },
+        { id: 'fallback-4', name: 'Kaligrafi', description: 'Mengasah kreativitas seni kaligrafi Arab', icon: 'PenTool', displayOrder: 4, isActive: true },
+    ];
+
+    const fallbackCharacterPrograms: CharacterProgram[] = [
+        { id: 'cp-1', name: '5S (Senyum, Salam, Sapa, Sopan, Santun)', description: 'Pembiasaan karakter di gerbang madrasah setiap pagi.', icon: 'SmilePlus', frequency: 'Setiap Hari', displayOrder: 1, isActive: true },
+        { id: 'cp-2', name: 'Sholat Dhuha & Dzuhur', description: 'Dilakukan berjamaah untuk melatih kedisiplinan ibadah.', icon: 'Sunrise', frequency: 'Setiap Hari', displayOrder: 2, isActive: true },
+        { id: 'cp-3', name: 'Murajaah Pagi', description: 'Membaca surat pendek dan Asmaul Husna sebelum KBM dimulai.', icon: 'BookOpen', frequency: 'Setiap Hari', displayOrder: 3, isActive: true },
+    ];
+
+    const extracurricularView = useMemo(
+        () => (extracurriculars.length ? extracurriculars : fallbackExtracurriculars),
+        [extracurriculars]
+    );
+
+    const characterProgramView = useMemo(
+        () => (characterPrograms.length ? characterPrograms : fallbackCharacterPrograms),
+        [characterPrograms]
+    );
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
@@ -43,20 +89,25 @@ const Kesiswaan: React.FC = () => {
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ekstrakurikuler</h2>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {[
-                            { name: "Pramuka", icon: <Activity /> },
-                            { name: "Drum Band", icon: <Music /> },
-                            { name: "Pencak Silat", icon: <Activity /> },
-                            { name: "Kaligrafi", icon: <PenTool /> },
-                            { name: "Qiro'ah", icon: <Music /> },
-                            { name: "Dokter Kecil", icon: <Activity /> },
-                            { name: "Robotika", icon: <ZapIcon /> },
-                            { name: "Futsal", icon: <Activity /> }
-                        ].map((ekskul, i) => (
-                            <div key={i} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-3 hover:border-primary dark:hover:border-green-500 transition cursor-default">
-                                <div className="text-primary dark:text-green-400 bg-green-50 dark:bg-green-900/30 p-2 rounded-full">{ekskul.icon}</div>
-                                <span className="font-semibold text-gray-700 dark:text-gray-200">{ekskul.name}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {extracurricularView.map((ekskul) => (
+                            <div
+                                key={ekskul.id}
+                                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-start gap-3 hover:border-primary dark:hover:border-green-500 transition"
+                            >
+                                <div className="text-primary dark:text-green-400 bg-green-50 dark:bg-green-900/30 p-2 rounded-full mt-1">
+                                    {ekskul.icon && iconMap[ekskul.icon] ? iconMap[ekskul.icon] : <Activity size={20} />}
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-gray-800 dark:text-gray-100">{ekskul.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ekskul.description}</p>
+                                    {ekskul.schedule && (
+                                        <p className="text-[11px] text-emerald-600 dark:text-emerald-300 mt-2">{ekskul.schedule}</p>
+                                    )}
+                                    {ekskul.coachName && (
+                                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Pembina: {ekskul.coachName}</p>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -66,21 +117,18 @@ const Kesiswaan: React.FC = () => {
                 <section className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-md transition-colors">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">Pembiasaan Karakter</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="text-center">
-                            <div className="text-4xl mb-2">🤝</div>
-                            <h3 className="font-bold text-lg mb-2 dark:text-gray-100">5S (Senyum, Salam, Sapa, Sopan, Santun)</h3>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">Dilakukan setiap pagi saat penyambutan siswa di gerbang.</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-4xl mb-2">🤲</div>
-                            <h3 className="font-bold text-lg mb-2 dark:text-gray-100">Sholat Dhuha & Dzuhur</h3>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">Dilakukan secara berjamaah untuk melatih kedisiplinan ibadah.</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-4xl mb-2">📖</div>
-                            <h3 className="font-bold text-lg mb-2 dark:text-gray-100">Murajaah Pagi</h3>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">Membaca surat pendek dan Asmaul Husna sebelum KBM dimulai.</p>
-                        </div>
+                        {characterProgramView.map((program) => (
+                            <div key={program.id} className="text-center">
+                                <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-300">
+                                    {program.icon && iconMap[program.icon] ? iconMap[program.icon] : <Heart size={20} />}
+                                </div>
+                                <h3 className="font-bold text-lg mb-2 dark:text-gray-100">{program.name}</h3>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm">{program.description}</p>
+                                {program.frequency && (
+                                    <p className="text-xs text-emerald-600 dark:text-emerald-300 mt-2">{program.frequency}</p>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </section>
 

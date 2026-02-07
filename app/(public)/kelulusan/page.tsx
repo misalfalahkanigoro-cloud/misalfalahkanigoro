@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import SimpleHero from '@/components/SimpleHero';
 import { api } from '@/lib/api';
-import type { GraduationStudent } from '@/lib/types';
+import type { GraduationStudent, PageHero } from '@/lib/types';
 
 const CekKelulusan: React.FC = () => {
     const [nisn, setNisn] = useState('');
@@ -12,6 +12,20 @@ const CekKelulusan: React.FC = () => {
     const [searched, setSearched] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hero, setHero] = useState<PageHero | null>(null);
+
+    useEffect(() => {
+        const fetchHero = async () => {
+            try {
+                const data = await api.getPageHero('kelulusan');
+                setHero(data as PageHero);
+            } catch (err) {
+                console.error('Failed to load page hero:', err);
+            }
+        };
+
+        fetchHero();
+    }, []);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -40,9 +54,9 @@ const CekKelulusan: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
             <SimpleHero
-                title="Cek Kelulusan"
-                subtitle="Sistem Informasi Pengumuman Kelulusan Siswa MIS Al-Falah Kanigoro."
-                image="https://picsum.photos/id/180/1920/800"
+                title={hero?.title || 'Cek Kelulusan'}
+                subtitle={hero?.subtitle || 'Sistem Informasi Pengumuman Kelulusan Siswa MIS Al-Falah Kanigoro.'}
+                image={hero?.imageUrl || 'https://picsum.photos/id/180/1920/800'}
             />
 
             <section className="py-16 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">

@@ -11,14 +11,14 @@ export async function GET(
             .from('news')
             .select('*')
             .eq('slug', slug)
-            .eq('is_published', true)
+            .eq('isPublished', true)
             .maybeSingle();
 
         if (error) {
             throw error;
         }
 
-        if (!news || !news.is_published) {
+        if (!news || !news.isPublished) {
             return NextResponse.json(
                 { error: 'NOT_FOUND' },
                 { status: 404 }

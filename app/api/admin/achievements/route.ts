@@ -25,12 +25,16 @@ export async function GET() {
         const { data, error } = await supabaseAdmin()
             .from('achievements')
             .select('*')
-            .order('isPinned', { ascending: false })
+            .order('is_pinned', { ascending: false })
             .order('achievedAt', { ascending: false })
             .order('createdAt', { ascending: false });
 
         if (error) throw error;
-        return NextResponse.json(data || []);
+        const mapped = (data || []).map((row) => ({
+            ...row,
+            isPinned: row.is_pinned,
+        }));
+        return NextResponse.json(mapped);
     } catch (error) {
         console.error('Admin achievements GET error:', error);
         return NextResponse.json({ error: 'Failed to fetch achievements' }, { status: 500 });
@@ -55,7 +59,7 @@ export async function POST(request: Request) {
             category: postInput.category || null,
             achievedAt: postInput.achievedAt || null,
             isPublished: postInput.isPublished ?? true,
-            isPinned: postInput.isPinned ?? false,
+            is_pinned: postInput.isPinned ?? false,
             meta: parseMeta(postInput.meta),
         };
 
@@ -91,7 +95,7 @@ export async function PUT(request: Request) {
             category: postInput.category || null,
             achievedAt: postInput.achievedAt || null,
             isPublished: postInput.isPublished ?? true,
-            isPinned: postInput.isPinned ?? false,
+            is_pinned: postInput.isPinned ?? false,
             meta: parseMeta(postInput.meta),
         };
 
