@@ -1,35 +1,27 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, Loader2, Share2, Search, ArrowRight, Tag } from 'lucide-react';
-import PublicHero from '@/components/PublicHero';
+import { Calendar, Loader2, Share2, Search, ArrowRight, Tag, FileText, Bell } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import type { ContentListResponse, ContentPost, ContentType } from '@/lib/types';
+import type { Publication, PublicationType } from '@/lib/types';
 
-const TYPE_OPTIONS: { label: string; value: ContentType | 'all' }[] = [
+const TYPE_OPTIONS: { label: string; value: PublicationType | 'all' }[] = [
     { label: 'Semua', value: 'all' },
-    { label: 'Berita', value: 'news' },
     { label: 'Pengumuman', value: 'announcement' },
     { label: 'Artikel', value: 'article' },
-    { label: 'Galeri', value: 'gallery' },
-    { label: 'Unduhan', value: 'download' },
+    { label: 'Buletin', value: 'bulletin' },
 ];
 
-const TYPE_THEME: Record<ContentType, { bg: string; text: string; label: string }> = {
-    news: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', label: 'Berita' },
-    announcement: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', label: 'Pengumuman' },
-    article: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-400', label: 'Artikel' },
-    gallery: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', label: 'Galeri' },
-    download: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300', label: 'Unduhan' },
+const TYPE_THEME: Record<string, { bg: string; text: string; label: string; icon: React.ReactNode }> = {
+    announcement: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', label: 'Pengumuman', icon: <Bell size={12} /> },
+    article: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-400', label: 'Artikel', icon: <FileText size={12} /> },
+    bulletin: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', label: 'Buletin', icon: <FileText size={12} /> },
 };
 
 const PublikasiPage: React.FC = () => {
-    const [posts, setPosts] = useState<ContentPost[]>([]);
-    const [categories, setCategories] = useState<string[]>([]);
-    const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-    const [category, setCategory] = useState<string>('Semua');
-    const [type, setType] = useState<ContentType | 'all'>('all');
+    const [posts, setPosts] = useState<Publication[]>([]);
+    const [type, setType] = useState<PublicationType | 'all'>('all');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
@@ -41,21 +33,28 @@ const PublikasiPage: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const data = await api.getContentPosts({
+            // Assuming separate endpoints or query params for publications
+            const res = await api.getPublications({
                 page,
                 pageSize,
-                category: category === 'Semua' ? undefined : category,
                 type: type === 'all' ? undefined : type,
-            }) as ContentListResponse;
-            setPosts(data.items || []);
-            setCategories(data.categories || []);
-            setTotal(data.total || 0);
-            setCategoryCounts(
-                (data.categoryCounts || []).reduce<Record<string, number>>((acc, curr) => {
-                    acc[curr.category] = curr.count;
-                    return acc;
-                }, {})
-            );
+            });
+
+            // Robust response handling
+            let items: Publication[] = [];
+            let totalItems = 0;
+
+            if (Array.isArray(res)) {
+                items = res;
+                totalItems = res.length;
+            } else if ((res as any).items) {
+                items = (res as any).items;
+                totalItems = (res as any).total || 0;
+            }
+
+            setPosts(items);
+            setTotal(totalItems);
+
         } catch (err) {
             console.error('Error fetching publikasi:', err);
             setError('Gagal memuat publikasi');
@@ -65,13 +64,13 @@ const PublikasiPage: React.FC = () => {
     };
 
     useEffect(() => {
+        setPage(1); // Reset page on type change
         fetchPosts();
-    }, [page, category, type]);
+    }, [type]);
 
     useEffect(() => {
-        setCategory('Semua');
-        setPage(1);
-    }, [type]);
+        fetchPosts();
+    }, [page]); // Re-fetch on page change
 
     const filteredPosts = useMemo(() => {
         if (!search) return posts;
@@ -80,15 +79,24 @@ const PublikasiPage: React.FC = () => {
 
     const maxPage = Math.max(1, Math.ceil(total / pageSize));
 
-    const handleShare = (post: ContentPost) => {
-        const text = `*${post.title}*\n\n${post.excerpt || ''}\n\nBaca selengkapnya di: ${window.location.protocol}//${window.location.host}/publikasi/${post.slug}`;
+    const handleShare = (post: Publication) => {
+        const url = typeof window !== 'undefined' ? `${window.location.origin}/publikasi/${post.slug}` : '';
+        const text = `*${post.title}*\n\nBaca selengkapnya: ${url}`;
         const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
         window.open(whatsappUrl, '_blank');
     };
 
     return (
         <div className="min-h-screen bg-white dark:bg-[#0B0F0C] transition-colors duration-300">
-            <PublicHero />
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Publikasi</h1>
+                </div>
+            </section>
 
             <div className="container mx-auto px-4 py-20">
                 <div className="bg-white dark:bg-[#151B16] rounded-[2rem] shadow-xl shadow-emerald-900/5 p-6 md:p-10 border border-emerald-900/5 dark:border-white/5">
@@ -124,7 +132,7 @@ const PublikasiPage: React.FC = () => {
 
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
                         {/* Main Content */}
-                        <div className="lg:col-span-3 space-y-10">
+                        <div className="lg:col-span-4 space-y-10">
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center py-24 space-y-4">
                                     <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
@@ -144,41 +152,39 @@ const PublikasiPage: React.FC = () => {
                                     <p className="text-gray-500 dark:text-gray-400 max-w-xs mx-auto text-sm">Maaf, kami tidak menemukan publikasi yang sesuai dengan kriteria yang Anda cari.</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {filteredPosts.map((post) => {
-                                        const theme = TYPE_THEME[post.type];
+                                        const theme = TYPE_THEME[post.type] || TYPE_THEME.article;
                                         return (
                                             <article
                                                 key={post.id}
-                                                className="group bg-white dark:bg-[#1A221B] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden hover:shadow-2xl hover:shadow-emerald-900/10 transition-all duration-500 flex flex-col"
+                                                className="group bg-white dark:bg-[#1A221B] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden hover:shadow-2xl hover:shadow-emerald-900/10 transition-all duration-500 flex flex-col h-full"
                                             >
-                                                <Link href={`/publikasi/${post.slug}`} className="relative h-56 overflow-hidden">
-                                                    <img
-                                                        src={post.coverUrl || 'https://images.unsplash.com/photo-1588072432836-e10032774350?auto=format&fit=crop&q=80&w=800'}
-                                                        alt={post.title}
-                                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                                                    />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                                                        <span className="text-white text-xs font-bold flex items-center gap-1">
-                                                            Baca Selengkapnya <ArrowRight size={14} />
-                                                        </span>
-                                                    </div>
-                                                    <div className={`absolute top-4 left-4 ${theme.bg} ${theme.text} px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider backdrop-blur-md`}>
-                                                        {theme.label}
+                                                {/* Cover Image is optional for publications, but nice to have */}
+                                                <Link href={`/publikasi/${post.slug}`} className="relative h-48 overflow-hidden bg-gray-100 dark:bg-white/5">
+                                                    {post.media && post.media.length > 0 ? (
+                                                        <img
+                                                            src={post.media[0].mediaUrl}
+                                                            alt={post.title}
+                                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                                            <FileText size={48} />
+                                                        </div>
+                                                    )}
+
+                                                    <div className={`absolute top-4 left-4 ${theme.bg} ${theme.text} px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-1`}>
+                                                        {theme.icon} {theme.label}
                                                     </div>
                                                 </Link>
+
                                                 <div className="p-6 flex-1 flex flex-col">
                                                     <div className="flex items-center gap-3 text-[11px] text-gray-400 mb-3">
                                                         <span className="flex items-center gap-1">
                                                             <Calendar size={12} className="text-emerald-500" />
-                                                            {new Date(post.publishedAt || post.createdAt || '').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            {new Date(post.publishedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                         </span>
-                                                        {post.category && (
-                                                            <span className="flex items-center gap-1">
-                                                                <Tag size={12} className="text-emerald-500" />
-                                                                {post.category}
-                                                            </span>
-                                                        )}
                                                     </div>
                                                     <Link href={`/publikasi/${post.slug}`} className="block group/title">
                                                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 line-clamp-2 leading-snug group-hover/title:text-emerald-600 transition">
@@ -186,7 +192,7 @@ const PublikasiPage: React.FC = () => {
                                                         </h3>
                                                     </Link>
                                                     <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-3 mb-6 leading-relaxed">
-                                                        {post.excerpt || post.contentText || 'Klik untuk membaca detail selengkapnya tentang publikasi ini.'}
+                                                        {post.description || post.content?.substring(0, 100) + '...'}
                                                     </p>
 
                                                     <div className="mt-auto flex items-center justify-between pt-5 border-t border-gray-50 dark:border-white/5">
@@ -246,46 +252,6 @@ const PublikasiPage: React.FC = () => {
                                 </div>
                             )}
                         </div>
-
-                        {/* Sidebar */}
-                        <aside className="space-y-8">
-                            <div className="bg-gray-50/50 dark:bg-white/5 rounded-3xl p-6 border border-gray-100 dark:border-white/5">
-                                <h4 className="text-base font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                                    <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
-                                    Kategori Publikasi
-                                </h4>
-                                <div className="flex flex-col gap-1">
-                                    <button
-                                        onClick={() => { setCategory('Semua'); setPage(1); }}
-                                        className={`flex items-center justify-between px-4 py-3 rounded-2xl transition ${category === 'Semua'
-                                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                                            : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-gray-600 dark:text-gray-400'
-                                            }`}
-                                    >
-                                        <span className="text-sm font-bold">Semua Kategori</span>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${category === 'Semua' ? 'bg-white/20' : 'bg-gray-200 dark:bg-white/10'}`}>
-                                            {total}
-                                        </span>
-                                    </button>
-                                    {categories.map((cat) => (
-                                        <button
-                                            key={cat}
-                                            onClick={() => { setCategory(cat); setPage(1); }}
-                                            className={`flex items-center justify-between px-4 py-3 rounded-2xl transition ${category === cat
-                                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                                                : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-gray-600 dark:text-gray-400'
-                                                }`}
-                                        >
-                                            <span className="text-sm font-bold">{cat}</span>
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${category === cat ? 'bg-white/20' : 'bg-gray-200 dark:bg-white/10'}`}>
-                                                {categoryCounts[cat] || 0}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                        </aside>
                     </div>
                 </div>
             </div>
@@ -294,5 +260,3 @@ const PublikasiPage: React.FC = () => {
 };
 
 export default PublikasiPage;
-
-

@@ -52,21 +52,17 @@ const VisiMisiPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-amber-50 dark:from-[#0A0F0B] dark:via-[#0B120E] dark:to-[#111A14] transition-colors duration-200 pb-16">
-            <section className="relative overflow-hidden">
-                <div className="absolute -top-16 right-12 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-500/10" />
-                <div className="absolute top-20 -left-16 h-72 w-72 rounded-full bg-amber-200/40 blur-3xl dark:bg-amber-500/10" />
-                <div className="container mx-auto px-4 py-14">
-                    <div className="max-w-3xl">
-                        <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-200">Profil Madrasah</p>
-                        <h1 className="mt-3 text-4xl font-semibold text-emerald-900 dark:text-white">Visi &amp; Misi Madrasah</h1>
-                        <p className="mt-4 text-lg text-emerald-900/70 dark:text-emerald-100/70">
-                            Arah, tujuan, dan komitmen kami dalam membangun generasi berakhlak serta berprestasi.
-                        </p>
+            <section className="border-b border-emerald-100/70 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0B0F0C]/80">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
                     </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Visi & Misi</h1>
                 </div>
             </section>
 
-            <section className="container mx-auto px-4">
+            <section className="container mx-auto px-4 py-16">
                 {loading && (
                     <div className="rounded-3xl border border-emerald-100 bg-white/80 p-10 text-center text-sm text-emerald-900/70 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-emerald-100/70">
                         <Loader2 className="mx-auto mb-3 animate-spin text-emerald-600" size={24} />

@@ -1,21 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Book, Zap, Layers, Award, Loader2 } from 'lucide-react';
-import SimpleHero from '@/components/SimpleHero';
+import { Loader2, BookOpen, Sparkles, X, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { AcademicPage } from '@/lib/types';
-
-const iconMap: Record<string, React.ReactNode> = {
-    Book: <Book size={24} />,
-    Award: <Award size={24} />,
-    Zap: <Zap size={24} />,
-};
+import type { AcademicPage, MediaItem } from '@/lib/types';
 
 const Akademik: React.FC = () => {
     const [page, setPage] = useState<AcademicPage | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [activeImage, setActiveImage] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchPage = async () => {
@@ -35,92 +29,204 @@ const Akademik: React.FC = () => {
 
     const fallback: AcademicPage = {
         id: 'main',
-        heroTitle: 'Akademik & Kurikulum',
-        heroSubtitle: 'Memadukan ilmu pengetahuan umum dan nilai-nilai keislaman untuk mencetak generasi cerdas.',
-        heroImageUrl: 'https://picsum.photos/id/20/1920/800',
-        curriculumTitle: 'Kurikulum Terintegrasi',
-        curriculumIntro1: 'MIS Al-Falah Kanigoro menerapkan kurikulum yang memadukan Kurikulum Nasional (K13 & Merdeka) dari Kemdikbud dengan Kurikulum Madrasah dari Kemenag.',
-        curriculumIntro2: 'Tujuannya adalah membekali siswa dengan kompetensi sains dan teknologi yang mumpuni, sekaligus pondasi agama yang kokoh.',
-        subjectsTitle: 'Mata Pelajaran Khas',
-        programsTitle: 'Program Unggulan',
-        subjects: [],
-        programs: [],
+        title: 'Akademik',
+        subtitle: 'Integrasi kurikulum nasional dan nilai keislaman.',
+        content: 'Halaman akademik berisi gambaran kurikulum, metode pembelajaran, dan program unggulan.',
+        sections: [
+            { id: '1', pageId: 'main', title: 'Kurikulum Terintegrasi', body: 'Kurikulum nasional dipadukan dengan kurikulum madrasah.', displayOrder: 1 },
+            { id: '2', pageId: 'main', title: 'Program Unggulan', body: 'Tahfidz, literasi, sains, dan penguatan bahasa.', displayOrder: 2 },
+            { id: '3', pageId: 'main', title: 'Metode Pembelajaran', body: 'Project based learning, kolaboratif, dan pembiasaan adab.', displayOrder: 3 },
+        ],
+        media: [],
+        coverUrl: null,
     };
 
     const view = page ?? fallback;
+    const mediaItems = (view.media || []) as MediaItem[];
+    const coverImage =
+        view.coverUrl ||
+        mediaItems.find((m) => m.isMain)?.mediaUrl ||
+        mediaItems[0]?.mediaUrl ||
+        'https://picsum.photos/1200/700';
+    const imageItems = mediaItems.filter((m) => m.mediaType === 'image' && m.mediaUrl !== coverImage);
+    const videoItems = mediaItems.filter((m) => m.mediaType === 'video' || m.mediaType === 'youtube_embed');
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-            <SimpleHero
-                title={view.heroTitle}
-                subtitle={view.heroSubtitle}
-                image={view.heroImageUrl || 'https://picsum.photos/id/20/1920/800'}
-            />
+        <div className="min-h-screen bg-white dark:bg-[#0B0F0C] transition-colors duration-300">
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Akademik</h1>
+                </div>
+            </section>
 
-            <div className="container mx-auto px-4 py-12 relative z-30 -mt-8">
-                {/* Kurikulum Section */}
-                <section className="mb-16">
-                    {loading && (
-                        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-center">
-                            <Loader2 className="animate-spin text-primary" size={28} />
-                        </div>
-                    )}
-                    {!loading && error && (
-                        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 text-red-500">
-                            {error}
-                        </div>
-                    )}
-                    {!loading && !error && (
-                        <div className="flex flex-col md:flex-row gap-8 items-center">
-                            <div className="w-full md:w-1/2">
-                                <h2 className="text-2xl font-bold text-primary dark:text-green-400 mb-4 flex items-center gap-2">
-                                    <Layers className="text-gold" /> {view.curriculumTitle}
-                                </h2>
-                                <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-4">
-                                    {view.curriculumIntro1}
-                                </p>
-                                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                                    {view.curriculumIntro2}
-                                </p>
+            <div className="container mx-auto px-4 py-14">
+                {(loading || error) && (
+                    <div className={`mb-8 rounded-3xl border px-6 py-4 ${error ? 'border-red-200 bg-red-50 text-red-600' : 'border-emerald-100/60 bg-white'}`}>
+                        {loading ? (
+                            <div className="flex items-center gap-3 text-sm text-emerald-600">
+                                <Loader2 className="animate-spin" size={18} /> Memuat konten akademik...
                             </div>
-                            <div className="w-full md:w-1/2 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-primary dark:border-green-500 transition-colors">
-                                <h3 className="font-bold text-gray-800 dark:text-white mb-3">{view.subjectsTitle}:</h3>
-                                <ul className="grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                    {view.subjects.map((subject) => (
-                                        <li key={subject.id} className="flex items-center gap-2">
-                                            <div className="w-2 h-2 bg-primary rounded-full"></div> {subject.name}
-                                        </li>
-                                    ))}
-                                </ul>
+                        ) : (
+                            <p className="text-sm">{error}</p>
+                        )}
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    <div className="lg:col-span-7 space-y-6">
+                        <div className="rounded-[2.5rem] border border-emerald-900/5 dark:border-white/10 bg-white dark:bg-[#151B16] p-8 md:p-10 shadow-xl shadow-emerald-900/5">
+                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-emerald-600/70 mb-4">
+                                <BookOpen size={14} /> Akademik
                             </div>
+                            <h2 className="text-3xl md:text-4xl font-black text-emerald-950 dark:text-white mb-4">
+                                {view.title}
+                            </h2>
+                            {view.subtitle && (
+                                <p className="text-lg text-emerald-900/70 dark:text-white/70 font-medium mb-6">
+                                    {view.subtitle}
+                                </p>
+                            )}
+                            {view.content && (
+                                <p className="text-sm md:text-base text-emerald-900/70 dark:text-white/70 leading-relaxed whitespace-pre-line">
+                                    {view.content}
+                                </p>
+                            )}
                         </div>
-                    )}
-                </section>
 
-                {/* Program Unggulan */}
-                <section>
-                    {!loading && !error && (
-                        <>
-                            <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-10">{view.programsTitle}</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                                {view.programs.map((program, index) => (
-                                    <div key={program.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition-all">
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${index % 3 === 0 ? 'bg-green-100 text-primary' : index % 3 === 1 ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'} dark:bg-green-900/30 dark:text-green-400`}>
-                                            {program.icon && iconMap[program.icon] ? iconMap[program.icon] : <Book size={24} />}
+                        <div className="rounded-[2.5rem] border border-emerald-900/5 dark:border-white/10 bg-white dark:bg-[#151B16] p-8 md:p-10 shadow-xl shadow-emerald-900/5">
+                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-emerald-600/70 mb-6">
+                                <Sparkles size={14} /> Sorotan Akademik
+                            </div>
+                            <div className="grid gap-5 md:grid-cols-2">
+                                {(view.sections || []).map((section, index) => (
+                                    <div
+                                        key={section.id || index}
+                                        className="rounded-3xl border border-emerald-900/10 dark:border-white/10 bg-emerald-50/60 dark:bg-white/5 p-6"
+                                    >
+                                        <div className="text-xs font-black uppercase tracking-[0.3em] text-emerald-500/80 mb-3">
+                                            {String(index + 1).padStart(2, '0')}
                                         </div>
-                                        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-3">{program.title}</h3>
-                                        <p className="text-gray-600 dark:text-gray-300 text-sm">
-                                            {program.description}
-                                        </p>
+                                        <h3 className="text-lg font-bold text-emerald-950 dark:text-white mb-2">
+                                            {section.title}
+                                        </h3>
+                                        {section.body && (
+                                            <p className="text-sm text-emerald-900/70 dark:text-white/70 leading-relaxed">
+                                                {section.body}
+                                            </p>
+                                        )}
                                     </div>
                                 ))}
-
+                                {(view.sections || []).length === 0 && (
+                                    <div className="rounded-3xl border border-dashed border-emerald-900/20 dark:border-white/10 bg-emerald-50/50 dark:bg-white/5 p-6 text-sm text-emerald-900/50 dark:text-white/50">
+                                        Belum ada bagian akademik yang ditampilkan.
+                                    </div>
+                                )}
                             </div>
-                        </>
-                    )}
-                </section>
+                        </div>
+                    </div>
+
+                    <div className="lg:col-span-5 space-y-6">
+                        <div className="relative aspect-[4/3] rounded-[2.5rem] overflow-hidden border border-emerald-900/10 dark:border-white/10 shadow-2xl shadow-emerald-900/20">
+                            <img src={coverImage} alt={view.title} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
+                            <div className="absolute bottom-0 left-0 right-0 p-6">
+                                <p className="text-xs uppercase tracking-[0.3em] text-white/70 mb-2">Cover Akademik</p>
+                                <h3 className="text-2xl font-black text-white">{view.title}</h3>
+                            </div>
+                        </div>
+
+                        {(imageItems.length > 0 || videoItems.length > 0) && (
+                            <div className="rounded-[2.5rem] border border-emerald-900/5 dark:border-white/10 bg-white dark:bg-[#151B16] p-8 shadow-xl shadow-emerald-900/5">
+                                <h3 className="text-lg font-bold text-emerald-950 dark:text-white mb-5">Galeri Akademik</h3>
+
+                                {imageItems.length > 0 && (
+                                    <div className="grid grid-cols-2 gap-3 mb-6">
+                                        {imageItems.map((media, idx) => (
+                                            <button
+                                                key={media.id || idx}
+                                                type="button"
+                                                onClick={() => setActiveImage(idx)}
+                                                className="relative rounded-2xl overflow-hidden aspect-square group"
+                                            >
+                                                <img
+                                                    src={media.mediaUrl}
+                                                    alt={media.caption || ''}
+                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {videoItems.length > 0 && (
+                                    <div className="space-y-4">
+                                        {videoItems.map((media, idx) => (
+                                            <div key={media.id || idx} className="rounded-2xl overflow-hidden border border-emerald-900/10 dark:border-white/10 bg-black/5">
+                                                {media.mediaType === 'video' ? (
+                                                    <video controls className="w-full aspect-video bg-black">
+                                                        <source src={media.mediaUrl} />
+                                                    </video>
+                                                ) : (
+                                                    media.mediaUrl.includes('<iframe') ? (
+                                                        <div className="aspect-video [&_iframe]:h-full [&_iframe]:w-full" dangerouslySetInnerHTML={{ __html: media.mediaUrl }} />
+                                                    ) : (
+                                                        <iframe src={media.mediaUrl} className="w-full aspect-video" allowFullScreen />
+                                                    )
+                                                )}
+                                                {media.caption && (
+                                                    <div className="px-4 py-2 text-xs text-emerald-900/70 dark:text-white/70 border-t border-emerald-900/10 dark:border-white/10 flex items-center gap-2">
+                                                        <Play size={12} /> {media.caption}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
+
+            {activeImage !== null && imageItems.length > 0 && (
+                <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+                    <button
+                        onClick={() => setActiveImage(null)}
+                        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition"
+                    >
+                        <X size={24} />
+                    </button>
+
+                    <button
+                        onClick={() => setActiveImage((prev) => (prev !== null && prev > 0 ? prev - 1 : imageItems.length - 1))}
+                        className="absolute left-6 top-1/2 -translate-y-1/2 p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition"
+                    >
+                        <ChevronLeft size={32} />
+                    </button>
+
+                    <div className="max-w-5xl w-full h-[80vh] flex flex-col items-center justify-center gap-6">
+                        <img
+                            src={imageItems[activeImage].mediaUrl}
+                            alt={imageItems[activeImage].caption || ''}
+                            className="max-h-full max-w-full object-contain rounded-xl"
+                        />
+                        {imageItems[activeImage].caption && (
+                            <p className="text-white text-lg font-bold">{imageItems[activeImage].caption}</p>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={() => setActiveImage((prev) => (prev !== null && prev < imageItems.length - 1 ? prev + 1 : 0))}
+                        className="absolute right-6 top-1/2 -translate-y-1/2 p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition"
+                    >
+                        <ChevronRight size={32} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

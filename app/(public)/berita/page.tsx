@@ -1,20 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Calendar, Share2, Loader2 } from 'lucide-react';
-import PublicHero from '@/components/PublicHero';
+import { Calendar, Share2, Loader2, User } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import type { NewsItem, NewsListResponse } from '@/lib/types';
+import type { NewsPost } from '@/lib/types';
 
 const Berita: React.FC = () => {
-    const [news, setNews] = useState<NewsItem[]>([]);
-    const [categories, setCategories] = useState<string[]>([]);
-    const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-    const [category, setCategory] = useState<string>('Semua');
+    const [news, setNews] = useState<NewsPost[]>([]);
     const [page, setPage] = useState(1);
-    const [total, setTotal] = useState(0);
     const pageSize = 6;
+    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -23,20 +19,19 @@ const Berita: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const data = await api.getNews({
-                    page,
-                    pageSize,
-                    category: category === 'Semua' ? undefined : category,
-                }) as NewsListResponse;
-                setNews(data.items);
-                setCategories(data.categories);
-                setTotal(data.total);
-                setCategoryCounts(
-                    data.categoryCounts.reduce<Record<string, number>>((acc, curr) => {
-                        acc[curr.category] = curr.count;
-                        return acc;
-                    }, {})
-                );
+                // Assuming API returns { items: NewsPost[], total: number } or just NewsPost[]
+                const res = await api.getNews({ page, pageSize });
+
+                // Handle various response types for robustness
+                if (Array.isArray(res)) {
+                    setNews(res);
+                    setTotal(res.length); // Mock total if no pagination metadata
+                } else if ((res as any).items) {
+                    setNews((res as any).items);
+                    setTotal((res as any).total || 0);
+                } else {
+                    setNews([]);
+                }
             } catch (err) {
                 console.error('Error fetching news:', err);
                 setError('Gagal memuat berita');
@@ -46,32 +41,42 @@ const Berita: React.FC = () => {
         };
 
         fetchNews();
-    }, [page, category]);
+    }, [page]);
 
+    // Simple Pagination Logic
     const maxPage = Math.max(1, Math.ceil(total / pageSize));
     const pageNumbers = Array.from({ length: maxPage }, (_, i) => i + 1);
 
-    useEffect(() => {
-        if (page > maxPage) {
-            setPage(maxPage);
-        }
-    }, [page, maxPage]);
-
-    const handleShare = (title: string) => {
-        const text = `*${title}*\n\nBaca berita selengkapnya di Website MIS Al-Falah Kanigoro.`;
+    const handleShare = (title: string, slug: string) => {
+        const url = typeof window !== 'undefined' ? `${window.location.origin}/berita/${slug}` : '';
+        const text = `*${title}*\n\nBaca selengkapnya: ${url}`;
         const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
         window.open(whatsappUrl, '_blank');
     };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
-            <PublicHero />
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Berita</h1>
+                </div>
+            </section>
 
             <div className="container mx-auto px-4 py-12">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="flex flex-col lg:flex-row gap-8">
 
                     {/* Main Content: News List */}
-                    <div className="lg:col-span-2 space-y-8">
+                    <div className="flex-1 space-y-8">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold border-l-4 border-primary pl-4 text-gray-800 dark:text-gray-100">
+                                Berita Terbaru
+                            </h2>
+                        </div>
+
                         {loading && (
                             <div className="flex items-center justify-center py-12">
                                 <Loader2 className="animate-spin text-primary" size={32} />
@@ -79,137 +84,87 @@ const Berita: React.FC = () => {
                         )}
 
                         {error && (
-                            <div className="text-center py-12 text-red-500">
+                            <div className="text-center py-12 text-red-500 bg-red-50 rounded-lg">
                                 <p>{error}</p>
                             </div>
                         )}
 
                         {!loading && !error && news.length === 0 && (
-                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
                                 <p>Belum ada berita tersedia.</p>
                             </div>
                         )}
 
-                        {!loading && !error && news.map((item) => (
-                            <article key={item.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row hover:shadow-md transition-all">
-                                <div className="md:w-1/3 h-48 md:h-auto">
-                                    <img src={item.thumbnailUrl || 'https://picsum.photos/800/600'} alt={item.title} className="w-full h-full object-cover" />
-                                </div>
-                                <div className="p-6 md:w-2/3 flex flex-col justify-center">
-                                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                        <span className="flex items-center gap-1">
-                                            <Calendar size={12} />
-                                            {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                        </span>
-                                        <span className="text-primary dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">{item.category}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {!loading && !error && news.map((item) => (
+                                <article key={item.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col h-full border border-gray-100 dark:border-gray-700">
+                                    <div className="relative h-56 overflow-hidden">
+                                        <Link href={`/berita/${item.slug}`}>
+                                            <img
+                                                src={item.coverUrl || 'https://picsum.photos/800/600'}
+                                                alt={item.title}
+                                                className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                                            />
+                                        </Link>
                                     </div>
-                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3 hover:text-primary dark:hover:text-green-400 cursor-pointer">{item.title}</h2>
-                                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">{item.excerpt}</p>
+                                    <div className="p-6 flex flex-col flex-grow">
+                                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                            <span className="flex items-center gap-1">
+                                                <Calendar size={14} />
+                                                {new Date(item.publishedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <User size={14} />
+                                                {item.authorName || 'Admin'}
+                                            </span>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 hover:text-primary dark:hover:text-green-400 line-clamp-2">
+                                            <Link href={`/berita/${item.slug}`}>{item.title}</Link>
+                                        </h3>
+                                        <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-3">
+                                            {item.excerpt || (item.content ? item.content.substring(0, 100) + '...' : '')}
+                                        </p>
 
-                                    <div className="flex items-center justify-between mt-auto">
-                                        {item.slug ? (
-                                            <Link href={`/berita/${item.slug}`} className="text-primary dark:text-green-400 font-medium text-sm hover:underline">Baca Selengkapnya</Link>
-                                        ) : (
-                                            <button className="text-primary dark:text-green-400 font-medium text-sm hover:underline">Baca Selengkapnya</button>
-                                        )}
-                                        <button
-                                            onClick={() => handleShare(item.title)}
-                                            className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-[#25D366] dark:hover:text-[#25D366] text-sm font-medium transition-colors px-3 py-1.5 rounded-full hover:bg-green-50 dark:hover:bg-gray-700 group"
-                                            title="Bagikan ke WhatsApp"
-                                        >
-                                            <Share2 size={16} className="group-hover:scale-110 transition-transform" />
-                                            <span>Share</span>
-                                        </button>
+                                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
+                                            <Link href={`/berita/${item.slug}`} className="text-primary dark:text-green-400 font-medium text-sm hover:underline">
+                                                Baca Selengkapnya
+                                            </Link>
+                                            <button
+                                                onClick={() => handleShare(item.title, item.slug)}
+                                                className="text-gray-400 hover:text-green-600 transition-colors p-2 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20"
+                                                title="Bagikan"
+                                            >
+                                                <Share2 size={18} />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            </article>
-                        ))}
-                        {!loading && !error && news.length > 0 && (
-                            <div className="flex flex-wrap justify-center mt-8 gap-2">
+                                </article>
+                            ))}
+                        </div>
+
+                        {/* Pagination */}
+                        {!loading && !error && news.length > 0 && maxPage > 1 && (
+                            <div className="flex justify-center mt-10 gap-2">
                                 <button
                                     onClick={() => setPage(p => Math.max(1, p - 1))}
                                     disabled={page <= 1}
-                                    className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                                    aria-label="Previous page"
+                                    className="px-4 py-2 rounded-lg border bg-white dark:bg-gray-800 disabled:opacity-50"
                                 >
-                                    ‹
+                                    Sebelumnya
                                 </button>
-                                {pageNumbers.map((num) => (
-                                    <button
-                                        key={num}
-                                        onClick={() => setPage(num)}
-                                        className={`w-10 h-10 rounded-full text-sm font-semibold flex items-center justify-center ${num === page ? 'bg-primary text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                                    >
-                                        {num}
-                                    </button>
-                                ))}
+                                <span className="px-4 py-2 font-medium text-gray-600 dark:text-gray-300">
+                                    Halaman {page} dari {maxPage}
+                                </span>
                                 <button
                                     onClick={() => setPage(p => Math.min(maxPage, p + 1))}
                                     disabled={page >= maxPage}
-                                    className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                                    aria-label="Next page"
+                                    className="px-4 py-2 rounded-lg border bg-white dark:bg-gray-800 disabled:opacity-50"
                                 >
-                                    ›
+                                    Selanjutnya
                                 </button>
-                                <div className="flex gap-2 items-center ml-2">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">Jump:</span>
-                                    <select
-                                        value={page}
-                                        onChange={(e) => setPage(parseInt(e.target.value, 10))}
-                                        className="h-10 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200"
-                                    >
-                                        {pageNumbers.map((num) => (
-                                            <option key={num} value={num}>Hal {num}</option>
-                                        ))}
-                                    </select>
-                                </div>
                             </div>
                         )}
                     </div>
-
-                    {/* Sidebar */}
-                    <aside className="space-y-8">
-                        {/* Categories */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm transition-colors">
-                            <h3 className="font-bold text-lg mb-4 border-b dark:border-gray-700 pb-2 text-gray-900 dark:text-white">Kategori</h3>
-                            <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                                {['Semua', ...categories].map((cat) => (
-                                    <li
-                                        key={cat}
-                                        onClick={() => {
-                                            setCategory(cat);
-                                            setPage(1);
-                                        }}
-                                        className={`flex justify-between cursor-pointer ${category === cat ? 'text-primary dark:text-green-400 font-semibold' : 'hover:text-primary dark:hover:text-green-400'}`}
-                                    >
-                                        <span>{cat}</span>
-                                        <span className="bg-gray-100 dark:bg-gray-700 px-2 rounded-full text-xs py-0.5">
-                                            {cat === 'Semua' ? total : (categoryCounts[cat] || 0)}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        {/* Recent Posts Mini */}
-                        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm transition-colors">
-                            <h3 className="font-bold text-lg mb-4 border-b dark:border-gray-700 pb-2 text-gray-900 dark:text-white">Terpopuler</h3>
-                            <div className="space-y-4">
-                                {[1, 2, 3].map((i) => (
-                                    <div key={i} className="flex gap-3 items-start group cursor-pointer">
-                                        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-md overflow-hidden shrink-0">
-                                            <img src={`https://picsum.photos/id/${1050 + i}/100/100`} className="w-full h-full object-cover" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-primary dark:group-hover:text-green-400 line-clamp-2">Kegiatan Tengah Semester Genap Tahun 2023</h4>
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">12 Okt 2023</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </aside>
-
                 </div>
             </div>
         </div>

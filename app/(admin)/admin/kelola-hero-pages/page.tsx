@@ -98,7 +98,7 @@ const KelolaHeroPagesPage: React.FC = () => {
     const handleUpload = async (file: File) => {
         try {
             const res = await api.upload.media(file, 'mis-al-falah/page-heroes');
-            setForm((prev) => ({ ...prev, image_url: res.url }));
+            setForm((prev) => ({ ...prev, image_url: res.mediaUrl || res.url || '' }));
         } catch (error) {
             console.error('Upload failed', error);
         }

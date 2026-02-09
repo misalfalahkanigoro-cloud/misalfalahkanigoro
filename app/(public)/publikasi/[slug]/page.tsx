@@ -1,42 +1,42 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Calendar, Tag, Share2, ArrowLeft, ArrowRight, Download, ExternalLink, Image as ImageIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import SimpleHero from '@/components/SimpleHero';
+import { Calendar, Share2, ArrowLeft, ArrowRight, ExternalLink, Image as ImageIcon, ChevronLeft, ChevronRight, X, User } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import type { ContentPost, ContentMedia, ContentPostDetailResponse } from '@/lib/types';
+import type { Publication, MediaItem } from '@/lib/types';
 
 const TYPE_LABEL: Record<string, string> = {
-    news: 'Berita',
     announcement: 'Pengumuman',
     article: 'Artikel',
-    gallery: 'Galeri',
-    download: 'Unduhan',
+    bulletin: 'Buletin',
 };
 
 const PublicationDetailPage: React.FC = () => {
     const params = useParams();
     const router = useRouter();
-    const slug = params.slug as string;
+    const slug = params?.slug as string;
 
-    const [post, setPost] = useState<ContentPost | null>(null);
-    const [media, setMedia] = useState<ContentMedia[]>([]);
+    const [post, setPost] = useState<Publication | null>(null);
+    const [media, setMedia] = useState<MediaItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activeImage, setActiveImage] = useState<number | null>(null);
 
     useEffect(() => {
+        if (!slug) return;
         const fetchDetail = async () => {
             setLoading(true);
             try {
-                const data = await api.getContentPostDetail(slug) as ContentPostDetailResponse;
-                if (data.post) {
-                    setPost(data.post);
-                    setMedia(data.media || []);
-                } else {
-                    setError('Publikasi tidak ditemukan');
+                // Should return Publication object with embedded media or separate
+                const data = await api.getPublicationDetail(slug);
+                if (!data) throw new Error('NOT_FOUND');
+
+                // Assuming data structure matches what we expect from API (single object with media relation)
+                setPost(data as Publication);
+                if ((data as Publication).media) {
+                    setMedia((data as Publication).media || []);
                 }
             } catch (err) {
                 console.error('Error fetching detail:', err);
@@ -46,7 +46,7 @@ const PublicationDetailPage: React.FC = () => {
             }
         };
 
-        if (slug) fetchDetail();
+        fetchDetail();
     }, [slug]);
 
     if (loading) {
@@ -73,9 +73,12 @@ const PublicationDetailPage: React.FC = () => {
         );
     }
 
+    // Filter media by type
     const images = media.filter(m => m.mediaType === 'image');
-    const files = media.filter(m => m.mediaType === 'file');
-    const embeds = media.filter(m => m.mediaType === 'embed');
+    const embeds = media.filter(m => m.mediaType === 'video' || m.mediaType === 'youtube_embed');
+
+    // Get a cover image for SimpleHero (either from post.media or placeholder)
+    const coverImage = images.find(img => img.isMain)?.mediaUrl || images[0]?.mediaUrl;
 
     const handleShare = () => {
         const text = `*${post.title}*\n\nBaca selengkapnya di: ${window.location.href}`;
@@ -85,13 +88,16 @@ const PublicationDetailPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-white dark:bg-[#0B0F0C] transition-colors duration-300 pb-20">
-            <SimpleHero
-                title={TYPE_LABEL[post.type] || 'Publikasi'}
-                subtitle={post.title}
-                image={post.coverUrl || undefined}
-            />
-
-            <div className="container mx-auto px-4 -mt-20 relative z-10">
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Detail Publikasi</h1>
+                </div>
+            </section>
+            <div className="container mx-auto px-4 py-20 relative z-10">
                 <div className="max-w-4xl mx-auto">
                     <div className="bg-white dark:bg-[#151B16] rounded-[2.5rem] shadow-2xl shadow-emerald-900/20 p-8 md:p-14 border border-emerald-900/5 dark:border-white/5">
 
@@ -106,14 +112,8 @@ const PublicationDetailPage: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <span className="flex items-center gap-1.5 text-xs font-bold text-gray-400 bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-full">
                                     <Calendar size={14} className="text-emerald-500" />
-                                    {new Date(post.publishedAt || post.createdAt || '').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    {new Date(post.publishedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                 </span>
-                                {post.category && (
-                                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10 px-4 py-2 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                        <Tag size={14} />
-                                        {post.category}
-                                    </span>
-                                )}
                             </div>
                         </div>
 
@@ -123,7 +123,7 @@ const PublicationDetailPage: React.FC = () => {
 
                         <div
                             className="prose prose-lg max-w-none dark:prose-invert prose-emerald prose-headings:font-black prose-p:leading-relaxed prose-img:rounded-3xl prose-a:text-emerald-600"
-                            dangerouslySetInnerHTML={{ __html: post.contentHtml || post.contentText || '' }}
+                            dangerouslySetInnerHTML={{ __html: post.content || post.description || '' }}
                         />
 
                         {/* Gallery Section */}
@@ -141,7 +141,7 @@ const PublicationDetailPage: React.FC = () => {
                                             className="group relative aspect-square rounded-3xl overflow-hidden cursor-pointer bg-gray-100 dark:bg-white/5"
                                         >
                                             <img
-                                                src={img.url || ''}
+                                                src={img.mediaUrl}
                                                 alt={img.caption || 'Gallery Image'}
                                                 className="w-full h-full object-cover group-hover:scale-110 transition duration-700"
                                             />
@@ -154,39 +154,7 @@ const PublicationDetailPage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Files Section */}
-                        {files.length > 0 && (
-                            <div className="mt-20 space-y-8">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-1.5 h-8 bg-emerald-500 rounded-full"></div>
-                                    <h2 className="text-2xl font-black text-gray-900 dark:text-white">Lampiran / Berkas</h2>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {files.map((file) => (
-                                        <a
-                                            key={file.id}
-                                            href={file.url || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center justify-between p-6 rounded-3xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 hover:border-emerald-500 transition group"
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center text-emerald-600 shadow-sm">
-                                                    <Download size={24} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-gray-900 dark:text-white line-clamp-1">{file.caption || 'Unduh Berkas'}</p>
-                                                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Dokumen Lampiran</p>
-                                                </div>
-                                            </div>
-                                            <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition" />
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Embeds Section */}
+                        {/* Embeds Section (Videos) */}
                         {embeds.length > 0 && (
                             <div className="mt-20 space-y-8">
                                 <div className="flex items-center gap-3">
@@ -198,8 +166,18 @@ const PublicationDetailPage: React.FC = () => {
                                         <div
                                             key={embed.id}
                                             className="aspect-video rounded-[2.5rem] overflow-hidden shadow-2xl border border-gray-100 dark:border-white/5"
-                                            dangerouslySetInnerHTML={{ __html: embed.embedHtml || '' }}
-                                        />
+                                        >
+                                            {embed.mediaType === 'youtube_embed' ? (
+                                                <iframe
+                                                    src={embed.mediaUrl}
+                                                    title={embed.caption || 'Video'}
+                                                    className="w-full h-full"
+                                                    allowFullScreen
+                                                />
+                                            ) : (
+                                                <video src={embed.mediaUrl} controls className="w-full h-full" />
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -246,7 +224,7 @@ const PublicationDetailPage: React.FC = () => {
 
                     <div className="max-w-5xl w-full h-[80vh] flex flex-col items-center justify-center gap-6">
                         <img
-                            src={images[activeImage].url || ''}
+                            src={images[activeImage].mediaUrl || ''}
                             alt={images[activeImage].caption || ''}
                             className="max-h-full max-w-full object-contain rounded-xl"
                         />

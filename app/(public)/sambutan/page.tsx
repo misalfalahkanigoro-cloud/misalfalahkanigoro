@@ -64,26 +64,17 @@ const SambutanPage: React.FC = () => {
 
     return (
         <div className={`${bodyFont.className} min-h-screen bg-gradient-to-br from-emerald-50 via-white to-amber-50 dark:from-[#0A0F0B] dark:via-[#0B120E] dark:to-[#111A14] transition-colors duration-200`}>
-            <section className="relative overflow-hidden">
-                <div className="absolute -top-32 right-10 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-500/10" />
-                <div className="absolute top-24 -left-20 h-80 w-80 rounded-full bg-amber-200/40 blur-3xl dark:bg-amber-500/10" />
-                <div className="container mx-auto px-4 py-16 lg:py-20">
-                    <div className="max-w-3xl space-y-6">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-white/5 dark:text-emerald-200">
-                            <Sparkles size={14} />
-                            Sambutan Kepala Madrasah
-                        </div>
-                        <h1 className={`${headingFont.className} text-4xl font-semibold leading-tight text-emerald-900 dark:text-white md:text-5xl`}>
-                            {greeting?.title || 'Sambutan Kepala Madrasah'}
-                        </h1>
-                        <p className="text-lg text-emerald-900/70 dark:text-emerald-100/70">
-                            {heroSubtitle || 'Sambutan kepala madrasah tidak tersedia.'}
-                        </p>
+            <section className="border-b border-emerald-100/70 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0B0F0C]/80">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
                     </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Sambutan</h1>
                 </div>
             </section>
 
-            <section className="container mx-auto px-4 pb-16">
+            <section className="container mx-auto px-4 py-16">
                 {loading && (
                     <div className="rounded-3xl border border-emerald-100 bg-white/80 p-10 text-center text-sm text-emerald-900/70 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-emerald-100/70">
                         Memuat sambutan...

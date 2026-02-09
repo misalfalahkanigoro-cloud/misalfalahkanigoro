@@ -63,6 +63,8 @@ const Kontak: React.FC = () => {
 
     const fallback: ContactPage = {
         id: 'main',
+        title: null,
+        description: null,
         address: '',
         phone: null,
         email: '',
@@ -86,17 +88,13 @@ const Kontak: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
-            <section className="relative overflow-hidden">
-                <div className="absolute -top-16 right-12 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-500/10" />
-                <div className="absolute top-20 -left-16 h-72 w-72 rounded-full bg-amber-200/40 blur-3xl dark:bg-amber-500/10" />
-                <div className="container mx-auto px-4 py-14">
-                    <div className="max-w-3xl">
-                        <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-200">Kontak</p>
-                        <h1 className="mt-3 text-4xl font-semibold text-emerald-900 dark:text-white">Hubungi Kami</h1>
-                        <p className="mt-4 text-lg text-emerald-900/70 dark:text-emerald-100/70">
-                            {error ? error : 'Kami siap membantu Anda. Silakan hubungi kontak di bawah ini.'}
-                        </p>
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
                     </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Kontak</h1>
                 </div>
             </section>
 

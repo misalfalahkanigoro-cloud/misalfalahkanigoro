@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Camera, Music, PenTool, Activity, Loader2, Tent, BookMarked, Paintbrush, Trophy, Sunrise, Heart, BookOpen, SmilePlus } from 'lucide-react';
-import SimpleHero from '@/components/SimpleHero';
 import { api } from '@/lib/api';
 import type { Activity as ActivityItem, CharacterProgram, Extracurricular } from '@/lib/types';
 
@@ -76,11 +75,15 @@ const Kesiswaan: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
-            <SimpleHero
-                title="Kesiswaan"
-                subtitle="Wadah kreativitas, bakat, dan pengembangan karakter siswa melalui berbagai kegiatan positif."
-            />
-
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Kesiswaan</h1>
+                </div>
+            </section>
             <div className="container mx-auto px-4 py-12 space-y-16">
                 {/* Ekstrakurikuler */}
                 <section>

@@ -95,7 +95,7 @@ const KelolaHeroSlidesPage: React.FC = () => {
     const handleUpload = async (file: File) => {
         try {
             const res = await api.upload.media(file, 'mis-al-falah/hero');
-            setForm((prev) => ({ ...prev, imageUrl: res.url }));
+            setForm((prev) => ({ ...prev, imageUrl: res.mediaUrl || res.url || '' }));
         } catch (error) {
             console.error('Upload failed', error);
         }

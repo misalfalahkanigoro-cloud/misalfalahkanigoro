@@ -72,51 +72,17 @@ const SejarahPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-amber-50 dark:from-[#0A0F0B] dark:via-[#0B120E] dark:to-[#111A14] transition-colors duration-200 pb-16">
-            <section className="relative overflow-hidden">
-                <div className="absolute -top-16 right-12 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-500/10" />
-                <div className="absolute top-20 -left-16 h-72 w-72 rounded-full bg-amber-200/40 blur-3xl dark:bg-amber-500/10" />
-                <div className="container mx-auto px-4 py-14">
-                    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] items-center">
-                        <div>
-                            <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-200">Sejarah Madrasah</p>
-                            <h1 className="mt-3 text-4xl font-semibold text-emerald-900 dark:text-white">{page?.title || 'Sejarah Madrasah'}</h1>
-                            <p className="mt-4 text-lg text-emerald-900/70 dark:text-emerald-100/70">
-                                {heroSubtitle || 'Sejarah belum tersedia.'}
-                            </p>
-                        </div>
-                        <div className="rounded-3xl border border-emerald-100 bg-white/80 p-4 shadow-lg shadow-emerald-100/40 backdrop-blur dark:border-white/10 dark:bg-white/5">
-                            <div className="relative h-56 w-full overflow-hidden rounded-2xl bg-emerald-50 dark:bg-white/10">
-                                {page?.coverImageUrl ? (
-                                    coverIsCloudinary ? (
-                                        <CldImage
-                                            src={page.coverImageUrl}
-                                            width={420}
-                                            height={280}
-                                            sizes="(max-width: 1024px) 100vw, 420px"
-                                            alt={page.title}
-                                            className="h-full w-full object-cover"
-                                            preserveTransformations
-                                        />
-                                    ) : (
-                                        <img src={page.coverImageUrl} alt={page.title} className="h-full w-full object-cover" />
-                                    )
-                                ) : (
-                                    <div className="flex h-full items-center justify-center text-xs uppercase tracking-[0.3em] text-emerald-600/70 dark:text-emerald-100/70">
-                                        Cover belum tersedia
-                                    </div>
-                                )}
-                            </div>
-                            {page?.videoUrl && (
-                                <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-100 dark:border-white/10">
-                                    <video src={page.videoUrl} controls className="w-full" />
-                                </div>
-                            )}
-                        </div>
+            <section className="border-b border-emerald-100/70 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0B0F0C]/80">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
                     </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Sejarah</h1>
                 </div>
             </section>
 
-            <section className="container mx-auto px-4">
+            <section className="container mx-auto px-4 py-16">
                 {loading && (
                     <div className="rounded-3xl border border-emerald-100 bg-white/80 p-10 text-center text-sm text-emerald-900/70 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-emerald-100/70">
                         <Loader2 className="mx-auto mb-3 animate-spin text-emerald-600" size={24} />

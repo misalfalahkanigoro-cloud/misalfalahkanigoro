@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { Search, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import SimpleHero from '@/components/SimpleHero';
 import { api } from '@/lib/api';
 import type { GraduationStudent, PageHero } from '@/lib/types';
 
@@ -53,11 +52,15 @@ const CekKelulusan: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-            <SimpleHero
-                title={hero?.title || 'Cek Kelulusan'}
-                subtitle={hero?.subtitle || 'Sistem Informasi Pengumuman Kelulusan Siswa MIS Al-Falah Kanigoro.'}
-                image={hero?.imageUrl || 'https://picsum.photos/id/180/1920/800'}
-            />
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Kelulusan</h1>
+                </div>
+            </section>
 
             <section className="py-16 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
                 <div className="container mx-auto px-4">
@@ -115,9 +118,9 @@ const CekKelulusan: React.FC = () => {
                                         }`}>
                                         {result.status === 'LULUS' ? 'LULUS' : 'DITUNDA'}
                                     </span>
-                                    {result.status === 'LULUS' && result.averageScore > 0 && (
+                                    {result.status === 'LULUS' && (result.averageScore ?? 0) > 0 && (
                                         <p className="mt-4 text-gray-700 dark:text-gray-300">
-                                            Nilai Rata-rata: <span className="font-bold text-primary dark:text-green-400">{result.averageScore.toFixed(1)}</span>
+                                            Nilai Rata-rata: <span className="font-bold text-primary dark:text-green-400">{result.averageScore?.toFixed(1)}</span>
                                         </p>
                                     )}
                                 </div>

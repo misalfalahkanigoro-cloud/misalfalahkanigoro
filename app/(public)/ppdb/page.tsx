@@ -1,454 +1,771 @@
+
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { CldUploadWidget } from 'next-cloudinary';
 import {
-    CheckCircle, Download, MessageCircle, FileText, User, Users, Upload, Send,
-    ChevronRight, ChevronLeft, Search, Printer, Check, Clock, AlertTriangle, Loader2
+    FileText,
+    User,
+    Search,
+    Users,
+    ArrowRight,
+    ArrowLeft,
+    Upload,
+    Loader2,
+    CheckCircle,
+    AlertTriangle,
 } from 'lucide-react';
-import SimpleHero from '@/components/SimpleHero';
-import { api } from '@/lib/api';
-import type { PPDBStatusResponse, PPDBFormData, PPDBSubmitResponse } from '@/lib/types';
+import api from '@/lib/api';
+import type { MediaItem, PPDBFormData, PPDBListItem, PPDBStatusResponse, PPDBWave } from '@/lib/types';
 
-const SCHOOL_PHONE = '+62 812-3456-7890';
+type FileType = 'kk' | 'akta_kelahiran' | 'ktp_wali' | 'pas_foto' | 'nisn' | 'ijazah_rapor';
+
+type FormStep = 0 | 1 | 2 | 3;
+
+type FormErrors = Record<string, string>;
+
+const FILE_LABELS: Record<FileType, string> = {
+    kk: 'Foto Kartu Keluarga (KK)',
+    akta_kelahiran: 'Akta Kelahiran',
+    ktp_wali: 'KTP Orang Tua/Wali',
+    pas_foto: 'Pas Foto Siswa',
+    nisn: 'Kartu/Print NISN',
+    ijazah_rapor: 'Ijazah/Rapor Terakhir',
+};
 
 const PPDB: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'info' | 'daftar' | 'status'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'daftar' | 'status' | 'list'>('info');
+    const [ppdbOpen, setPpdbOpen] = useState(true);
+    const [activeWave, setActiveWave] = useState<PPDBWave | null>(null);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
-            <SimpleHero
-                title="PPDB Online Terpadu"
-                subtitle="Penerimaan Peserta Didik Baru Tahun Ajaran 2024/2025."
-                image="https://picsum.photos/id/201/1920/800"
-            />
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">PPDB</h1>
+                </div>
+            </section>
 
-            <div className="container mx-auto px-4 -mt-10 relative z-30">
+            <div className="container mx-auto px-4 py-12 relative z-30">
+                <ActiveWaveWatcher onStatus={setPpdbOpen} onWave={setActiveWave} />
+                <HeroBrosur waveId={activeWave?.id} />
+                {!ppdbOpen && (
+                    <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                        PPDB sedang ditutup. Saat ini belum ada gelombang pendaftaran yang aktif.
+                    </div>
+                )}
 
-                {/* Tab Navigation */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-2 mb-8 flex flex-wrap justify-center gap-2 transition-colors">
                     <button
                         onClick={() => setActiveTab('info')}
-                        className={`px-6 py-3 rounded-lg font-bold text-sm md:text-base flex items-center gap-2 transition-all ${activeTab === 'info' ? 'bg-primary text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                        className={`px-6 py-3 rounded-lg font-bold text-sm md:text-base flex items-center gap-2 transition-all ${activeTab === 'info' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                     >
                         <FileText size={18} /> Informasi PPDB
                     </button>
                     <button
                         onClick={() => setActiveTab('daftar')}
-                        className={`px-6 py-3 rounded-lg font-bold text-sm md:text-base flex items-center gap-2 transition-all ${activeTab === 'daftar' ? 'bg-primary text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                        disabled={!ppdbOpen}
+                        className={`px-6 py-3 rounded-lg font-bold text-sm md:text-base flex items-center gap-2 transition-all ${activeTab === 'daftar' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'} ${!ppdbOpen ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                         <User size={18} /> Daftar Sekarang
                     </button>
                     <button
                         onClick={() => setActiveTab('status')}
-                        className={`px-6 py-3 rounded-lg font-bold text-sm md:text-base flex items-center gap-2 transition-all ${activeTab === 'status' ? 'bg-primary text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                        className={`px-6 py-3 rounded-lg font-bold text-sm md:text-base flex items-center gap-2 transition-all ${activeTab === 'status' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                     >
                         <Search size={18} /> Cek Status
                     </button>
+                    <button
+                        onClick={() => setActiveTab('list')}
+                        className={`px-6 py-3 rounded-lg font-bold text-sm md:text-base flex items-center gap-2 transition-all ${activeTab === 'list' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                    >
+                        <Users size={18} /> Daftar Pendaftar
+                    </button>
                 </div>
 
-                {/* Content Area */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm min-h-[500px] transition-colors overflow-hidden">
-                    {activeTab === 'info' && <InfoTab setActiveTab={setActiveTab} />}
-                    {activeTab === 'daftar' && <FormTab />}
+                    {activeTab === 'info' && <InfoTab />}
+                    {activeTab === 'daftar' && <FormTab ppdbOpen={ppdbOpen} activeWave={activeWave} />}
                     {activeTab === 'status' && <StatusTab />}
+                    {activeTab === 'list' && <ListTab />}
                 </div>
-
             </div>
         </div>
     );
 };
 
-// --- COMPONENTS FOR TABS ---
+export default PPDB;
 
-const InfoTab: React.FC<{ setActiveTab: (tab: 'daftar') => void }> = ({ setActiveTab }) => {
+const ActiveWaveWatcher: React.FC<{ onStatus: (open: boolean) => void; onWave: (wave: PPDBWave | null) => void }> = ({
+    onStatus,
+    onWave,
+}) => {
+    useEffect(() => {
+        const fetchWave = async () => {
+            try {
+                const res = await fetch('/api/ppdb/active-wave');
+                const json = await res.json();
+                const active = Boolean(json?.active);
+                onStatus(active);
+                onWave(active ? (json.wave as PPDBWave) : null);
+            } catch (error) {
+                console.error('Failed to fetch active wave', error);
+                onStatus(false);
+                onWave(null);
+            }
+        };
+        fetchWave();
+    }, [onStatus, onWave]);
+
+    return null;
+};
+
+const HeroBrosur: React.FC<{ waveId?: string | null }> = ({ waveId }) => {
+    const [items, setItems] = useState<MediaItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchBrosur = async () => {
+            try {
+                const params = new URLSearchParams({ entityType: 'ppdb' });
+                if (waveId) params.set('entityId', waveId);
+                const res = await fetch(`/api/media-items?${params.toString()}`);
+                const json = await res.json();
+                setItems(Array.isArray(json) ? json : []);
+            } catch (error) {
+                console.error('Failed to fetch brosur', error);
+                setItems([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchBrosur();
+    }, [waveId]);
+
     return (
-        <div className="p-8 animate-fade-in">
-            <div className="text-center mb-8">
-                <div className="inline-block bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-6 py-2 rounded-full font-bold text-sm border border-green-200 dark:border-green-800">
-                    GELOMBANG 1: JANUARI - MARET 2024
+        <div className="mb-10">
+            <div className="flex items-center justify-between gap-4 mb-4">
+                <div>
+                    <p className="text-xs uppercase tracking-[0.35em] text-emerald-600/70">Brosur PPDB</p>
+                    <h2 className="text-xl md:text-2xl font-bold text-emerald-950 dark:text-white">Informasi Utama PPDB</h2>
                 </div>
+                {loading && <Loader2 className="animate-spin text-emerald-600" size={20} />}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                {/* Syarat */}
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-100 dark:border-gray-600">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                        <CheckCircle className="text-primary dark:text-green-400" /> Syarat Pendaftaran
-                    </h3>
-                    <ul className="space-y-3 text-gray-700 dark:text-gray-300 text-sm">
-                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2"></div>Mengisi Formulir Pendaftaran Online</li>
-                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2"></div>Scan Akta Kelahiran (Asli/Fotokopi)</li>
-                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2"></div>Scan Kartu Keluarga (KK)</li>
-                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2"></div>Pas Foto berwarna 3x4 (Background Merah)</li>
-                        <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2"></div>Usia minimal 6 tahun pada bulan Juli 2024</li>
-                    </ul>
+            {items.length === 0 && !loading ? (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-6 text-sm text-emerald-700">
+                    Brosur PPDB belum tersedia.
                 </div>
-
-                {/* Alur */}
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-100 dark:border-gray-600">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                        <Clock className="text-primary dark:text-green-400" /> Alur Pendaftaran
-                    </h3>
-                    <div className="space-y-4">
-                        {[
-                            { title: "1. Daftar Online", desc: "Isi data diri dan upload berkas di menu 'Daftar Sekarang'." },
-                            { title: "2. Verifikasi", desc: "Panitia memverifikasi kelengkapan berkas (1-3 hari kerja)." },
-                            { title: "3. Tes Observasi", desc: "Calon siswa mengikuti pemetaan kemampuan dasar secara offline." },
-                            { title: "4. Pengumuman", desc: "Cek hasil kelulusan di menu 'Cek Status'." }
-                        ].map((step, i) => (
-                            <div key={i} className="flex gap-3">
-                                <div className="bg-white dark:bg-gray-600 w-8 h-8 rounded-full flex items-center justify-center font-bold text-primary dark:text-green-400 shadow-sm shrink-0 border dark:border-gray-500">
-                                    {i + 1}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-gray-800 dark:text-white text-sm">{step.title}</h4>
-                                    <p className="text-gray-500 dark:text-gray-400 text-xs">{step.desc}</p>
-                                </div>
+            ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                    {items.map((item) => (
+                        <div key={item.id} className="rounded-2xl border border-emerald-100/60 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/5">
+                            <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-emerald-50">
+                                <img src={item.mediaUrl} alt={item.caption || 'Brosur PPDB'} className="h-full w-full object-cover" />
                             </div>
-                        ))}
+                            {item.caption && <p className="mt-3 text-xs text-gray-600 dark:text-gray-300">{item.caption}</p>}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+const InfoTab: React.FC = () => {
+    return (
+        <div className="p-6 md:p-10">
+            <div className="grid gap-6 lg:grid-cols-3">
+                <div className="lg:col-span-2 space-y-4">
+                    <h3 className="text-2xl font-semibold text-emerald-900 dark:text-white">Informasi PPDB</h3>
+                    <p className="text-sm text-emerald-900/70 dark:text-emerald-100/70">
+                        Pendaftaran peserta didik baru MIS Al-Falah Kanigoro dilakukan secara daring. Pastikan semua data dan
+                        berkas diisi dengan benar sesuai dokumen resmi.
+                    </p>
+                    <div className="grid gap-3 text-sm text-emerald-900/70 dark:text-emerald-100/70">
+                        <div className="rounded-2xl border border-emerald-100/70 bg-emerald-50/70 px-4 py-3">
+                            Semua isian wajib diisi dan akan diverifikasi oleh panitia.
+                        </div>
+                        <div className="rounded-2xl border border-emerald-100/70 bg-emerald-50/70 px-4 py-3">
+                            Format berkas: JPG/PNG, maksimal 2MB per file.
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                    onClick={() => setActiveTab('daftar')}
-                    className="bg-primary hover:bg-secondary text-white py-4 px-8 rounded-full font-bold transition shadow-lg flex items-center justify-center gap-2 transform hover:scale-105"
-                >
-                    Mulai Pendaftaran Online <ChevronRight size={20} />
-                </button>
-                <a
-                    href="#"
-                    className="bg-white dark:bg-gray-700 text-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 py-4 px-8 rounded-full font-bold transition hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center justify-center gap-2"
-                >
-                    <Download size={20} /> Download Brosur PDF
-                </a>
-            </div>
-
-            <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                Butuh bantuan? <a href={`https://wa.me/${SCHOOL_PHONE.replace(/[^0-9]/g, '')}`} className="text-primary dark:text-green-400 font-bold underline">Chat Panitia via WhatsApp</a>
+                <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
+                    <h4 className="text-sm font-semibold text-emerald-900 dark:text-white mb-3">Alur Pendaftaran</h4>
+                    <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                        <li>1. Isi data siswa</li>
+                        <li>2. Isi data orang tua/wali</li>
+                        <li>3. Upload berkas pendukung</li>
+                        <li>4. Review dan kirim pendaftaran</li>
+                    </ol>
+                </div>
             </div>
         </div>
     );
 };
-
-const FormTab: React.FC = () => {
-    const [step, setStep] = useState(1);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [registrationId, setRegistrationId] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    const [formData, setFormData] = useState<PPDBFormData>({
-        namaLengkap: '', nik: '', nisn: '', tempatLahir: '', tanggalLahir: '', jenisKelamin: 'L', alamat: '',
-        namaAyah: '', pekerjaanAyah: '', namaIbu: '', pekerjaanIbu: '', noHp: ''
-    });
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        setError(null);
-
-        try {
-            const response = await api.submitPPDB(formData) as PPDBSubmitResponse;
-            setRegistrationId(response.registrationId);
-            setStep(5);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Gagal mengirim pendaftaran';
-            setError(message);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const nextStep = () => setStep(prev => prev + 1);
-    const prevStep = () => setStep(prev => prev - 1);
-
-    if (step === 5) {
-        return <SuccessState registrationId={registrationId!} />;
-    }
-
-    return (
-        <div className="p-4 md:p-8 animate-fade-in">
-            {/* Stepper */}
-            <div className="flex justify-between items-center mb-10 px-4 md:px-20 relative">
-                {[1, 2, 3, 4].map((s) => (
-                    <div key={s} className="relative z-10 flex flex-col items-center">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ${step >= s ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-                            {step > s ? <Check size={16} /> : s}
-                        </div>
-                        <span className="text-xs mt-2 font-medium text-gray-500 dark:text-gray-400 hidden md:block">
-                            {s === 1 ? 'Data Siswa' : s === 2 ? 'Orang Tua' : s === 3 ? 'Berkas' : 'Review'}
-                        </span>
-                    </div>
-                ))}
-                {/* Connecting Line */}
-                <div className="absolute top-5 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700 -z-0">
-                    <div
-                        className="h-full bg-primary transition-all duration-300"
-                        style={{ width: `${((step - 1) / 3) * 100}%` }}
-                    ></div>
-                </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
-                {step === 1 && (
-                    <div className="space-y-4 animate-slide-in">
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 dark:border-gray-700">Langkah 1: Identitas Calon Siswa</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="col-span-2">
-                                <label className="label">Nama Lengkap *</label>
-                                <input type="text" name="namaLengkap" required value={formData.namaLengkap} onChange={handleChange} className="input-field" placeholder="Sesuai Akta Kelahiran" />
-                            </div>
-                            <div>
-                                <label className="label">NIK (Nomor Induk Kependudukan) *</label>
-                                <input type="text" name="nik" required value={formData.nik} onChange={handleChange} className="input-field" placeholder="16 Digit NIK" maxLength={16} />
-                            </div>
-                            <div>
-                                <label className="label">NISN (Jika Ada)</label>
-                                <input type="text" name="nisn" value={formData.nisn} onChange={handleChange} className="input-field" placeholder="Dari TK/RA" />
-                            </div>
-                            <div>
-                                <label className="label">Tempat Lahir *</label>
-                                <input type="text" name="tempatLahir" required value={formData.tempatLahir} onChange={handleChange} className="input-field" />
-                            </div>
-                            <div>
-                                <label className="label">Tanggal Lahir *</label>
-                                <input type="date" name="tanggalLahir" required value={formData.tanggalLahir} onChange={handleChange} className="input-field" />
-                            </div>
-                            <div>
-                                <label className="label">Jenis Kelamin *</label>
-                                <select name="jenisKelamin" value={formData.jenisKelamin} onChange={handleChange} className="input-field">
-                                    <option value="L">Laki-laki</option>
-                                    <option value="P">Perempuan</option>
-                                </select>
-                            </div>
-                            <div className="col-span-2">
-                                <label className="label">Alamat Lengkap *</label>
-                                <textarea name="alamat" required value={formData.alamat} onChange={handleChange} className="input-field" rows={3}></textarea>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {step === 2 && (
-                    <div className="space-y-4 animate-slide-in">
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 dark:border-gray-700">Langkah 2: Data Orang Tua / Wali</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="label">Nama Ayah Kandung *</label>
-                                <input type="text" name="namaAyah" required value={formData.namaAyah} onChange={handleChange} className="input-field" />
-                            </div>
-                            <div>
-                                <label className="label">Pekerjaan Ayah</label>
-                                <input type="text" name="pekerjaanAyah" value={formData.pekerjaanAyah} onChange={handleChange} className="input-field" />
-                            </div>
-                            <div>
-                                <label className="label">Nama Ibu Kandung *</label>
-                                <input type="text" name="namaIbu" required value={formData.namaIbu} onChange={handleChange} className="input-field" />
-                            </div>
-                            <div>
-                                <label className="label">Pekerjaan Ibu</label>
-                                <input type="text" name="pekerjaanIbu" value={formData.pekerjaanIbu} onChange={handleChange} className="input-field" />
-                            </div>
-                            <div className="col-span-2">
-                                <label className="label">Nomor WhatsApp Aktif *</label>
-                                <input type="tel" name="noHp" required value={formData.noHp} onChange={handleChange} className="input-field" placeholder="Contoh: 081234567890" />
-                                <p className="text-xs text-gray-500 mt-1">Info kelulusan akan dikirim melalui nomor ini.</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {step === 3 && (
-                    <div className="space-y-6 animate-slide-in">
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 dark:border-gray-700">Langkah 3: Upload Berkas</h3>
-                        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg text-sm text-yellow-800 dark:text-yellow-200 mb-4 border border-yellow-200 dark:border-yellow-700">
-                            Format yang diperbolehkan: JPG, PNG, PDF. Maksimal 2MB per file.
-                        </div>
-
-                        {[
-                            { label: "Scan Akta Kelahiran", id: "akta" },
-                            { label: "Scan Kartu Keluarga (KK)", id: "kk" },
-                            { label: "Pas Foto 3x4 (Warna)", id: "foto" }
-                        ].map((item) => (
-                            <div key={item.id} className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition cursor-pointer relative group">
-                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" />
-                                <div className="flex flex-col items-center">
-                                    <Upload size={32} className="text-gray-400 group-hover:text-primary mb-2" />
-                                    <span className="font-medium text-gray-700 dark:text-gray-300">{item.label}</span>
-                                    <span className="text-xs text-gray-500">Klik untuk memilih file</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {step === 4 && (
-                    <div className="space-y-6 animate-slide-in">
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 dark:border-gray-700">Langkah 4: Review Data</h3>
-                        <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg space-y-4 text-sm">
-                            <div className="grid grid-cols-3 gap-2">
-                                <span className="text-gray-500 dark:text-gray-400">Nama Lengkap</span>
-                                <span className="col-span-2 font-bold text-gray-900 dark:text-white">: {formData.namaLengkap}</span>
-
-                                <span className="text-gray-500 dark:text-gray-400">NIK</span>
-                                <span className="col-span-2 font-bold text-gray-900 dark:text-white">: {formData.nik}</span>
-
-                                <span className="text-gray-500 dark:text-gray-400">TTL</span>
-                                <span className="col-span-2 font-bold text-gray-900 dark:text-white">: {formData.tempatLahir}, {formData.tanggalLahir}</span>
-
-                                <span className="text-gray-500 dark:text-gray-400">Nama Ayah</span>
-                                <span className="col-span-2 font-bold text-gray-900 dark:text-white">: {formData.namaAyah}</span>
-
-                                <span className="text-gray-500 dark:text-gray-400">No. WhatsApp</span>
-                                <span className="col-span-2 font-bold text-gray-900 dark:text-white">: {formData.noHp}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input type="checkbox" id="confirm" required className="w-5 h-5 text-primary rounded focus:ring-primary" />
-                            <label htmlFor="confirm" className="text-sm text-gray-700 dark:text-gray-300">Saya menyatakan data di atas adalah benar dan dapat dipertanggungjawabkan.</label>
-                        </div>
-                    </div>
-                )}
-
-                <div className="flex justify-between mt-8 pt-4 border-t dark:border-gray-700">
-                    {step > 1 ? (
-                        <button type="button" onClick={prevStep} className="px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2">
-                            <ChevronLeft size={18} /> Kembali
-                        </button>
-                    ) : <div></div>}
-
-                    {step < 4 ? (
-                        <button type="button" onClick={nextStep} className="px-6 py-2 rounded-lg bg-primary text-white font-bold hover:bg-secondary transition flex items-center gap-2">
-                            Selanjutnya <ChevronRight size={18} />
-                        </button>
-                    ) : (
-                        <button type="submit" disabled={isSubmitting} className="px-8 py-2 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-                            {isSubmitting ? 'Mengirim...' : 'Kirim Pendaftaran'} <Send size={18} />
-                        </button>
-                    )}
-                </div>
-            </form>
-        </div>
-    );
-};
-
-const SuccessState: React.FC<{ registrationId: string }> = ({ registrationId }) => {
-    return (
-        <div className="p-10 text-center animate-scale-up">
-            <div className="w-24 h-24 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle size={48} className="text-green-600 dark:text-green-400" />
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Pendaftaran Berhasil!</h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-8">Data Anda telah kami terima. Silakan simpan ID Pendaftaran berikut.</p>
-
-            <div className="bg-gray-100 dark:bg-gray-700 p-6 rounded-xl inline-block mb-8 border-2 border-dashed border-gray-300 dark:border-gray-500">
-                <span className="block text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">ID Pendaftaran Anda</span>
-                <span className="text-3xl font-mono font-bold text-primary dark:text-green-400">{registrationId}</span>
-            </div>
-
-            <div className="flex justify-center gap-4">
-                <button className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-bold hover:bg-secondary transition shadow">
-                    <Printer size={18} /> Cetak Bukti
-                </button>
-                <button className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg font-bold hover:bg-gray-50 transition">
-                    <Download size={18} /> Simpan PDF
-                </button>
-            </div>
-            <p className="mt-8 text-sm text-gray-500">Screenshot halaman ini jika diperlukan.</p>
-        </div>
-    )
-}
 
 const StatusTab: React.FC = () => {
-    const [regId, setRegId] = useState('');
-    const [statusResult, setStatusResult] = useState<PPDBStatusResponse | null | 'NOT_FOUND'>(null);
+    const [nisn, setNisn] = useState('');
     const [loading, setLoading] = useState(false);
+    const [data, setData] = useState<PPDBStatusResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const checkStatus = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!regId.trim()) return;
-
+    const handleCheck = async () => {
         setLoading(true);
-        setStatusResult(null);
         setError(null);
-
+        setData(null);
         try {
-            const result = await api.checkPPDBStatus(regId.trim()) as PPDBStatusResponse;
-            setStatusResult(result);
+            const response = await api.checkPPDBStatus(nisn.trim());
+            setData(response as PPDBStatusResponse);
         } catch (err) {
-            const message = err instanceof Error ? err.message : '';
-            if (message === 'NOT_FOUND') {
-                setStatusResult('NOT_FOUND');
-            } else {
-                setError(message || 'Gagal mengecek status');
-            }
+            setError(err instanceof Error ? err.message : 'Gagal mengecek status');
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     return (
-        <div className="p-8 max-w-2xl mx-auto animate-fade-in">
-            <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Cek Status Pendaftaran</h3>
-                <p className="text-gray-500 dark:text-gray-400">Masukkan ID Pendaftaran yang Anda dapatkan saat mendaftar.</p>
+        <div className="p-6 md:p-10 space-y-6">
+            <div>
+                <h3 className="text-2xl font-semibold text-emerald-900 dark:text-white">Cek Status Pendaftaran</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Masukkan NISN untuk melihat status pendaftaran.</p>
             </div>
-
-            <form onSubmit={checkStatus} className="flex gap-2 mb-8">
+            <div className="flex flex-col md:flex-row gap-3">
                 <input
                     type="text"
-                    value={regId}
-                    onChange={(e) => setRegId(e.target.value)}
-                    placeholder="Contoh: REG-2024-001"
-                    className="flex-grow px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white outline-none"
+                    value={nisn}
+                    onChange={(e) => setNisn(e.target.value.replace(/\D/g, ''))}
+                    className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-black/30"
+                    placeholder="Masukkan NISN"
                 />
-                <button type="submit" disabled={loading} className="bg-primary text-white px-6 rounded-lg font-bold hover:bg-secondary transition flex items-center gap-2">
-                    {loading ? '...' : <Search size={20} />} Cek
+                <button
+                    onClick={handleCheck}
+                    className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white"
+                    disabled={loading || nisn.length === 0}
+                >
+                    {loading ? 'Memeriksa...' : 'Cek Status'}
                 </button>
-            </form>
-
-            {statusResult === 'NOT_FOUND' && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-3 text-red-700 dark:text-red-400">
-                    <AlertTriangle size={24} />
-                    <div>
-                        <p className="font-bold">Data tidak ditemukan</p>
-                        <p className="text-sm">Periksa kembali ID Pendaftaran Anda.</p>
-                    </div>
+            </div>
+            {error && (
+                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                    {error}
                 </div>
             )}
-
-            {statusResult && typeof statusResult !== 'string' && (
-                <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl shadow-lg overflow-hidden animate-slide-up">
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 border-b border-gray-100 dark:border-gray-600 flex justify-between items-center">
-                        <span className="font-mono font-bold text-gray-600 dark:text-gray-400">{statusResult.id}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{statusResult.tanggalDaftar}</span>
-                    </div>
-                    <div className="p-6">
-                        <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{statusResult.nama}</h4>
-                        <div className="mt-4 mb-6">
-                            <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${statusResult.status === 'DITERIMA' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' :
-                                statusResult.status === 'DITOLAK' ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' :
-                                    statusResult.status === 'BERKAS_VALID' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' :
-                                        'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300'
-                                }`}>
-                                {statusResult.status.replace('_', ' ')}
-                            </span>
-                        </div>
-                        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                            <p className="text-gray-700 dark:text-gray-300 text-sm font-medium">Pesan Panitia:</p>
-                            <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{statusResult.pesan}</p>
-                        </div>
+            {data && (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5 text-sm text-emerald-900/80 dark:border-white/10 dark:bg-white/5 dark:text-white">
+                    <p><span className="font-semibold">Nomor Pendaftaran (NISN):</span> {data.id}</p>
+                    <p><span className="font-semibold">Nama:</span> {data.nama}</p>
+                    <p><span className="font-semibold">Tanggal Daftar:</span> {data.tanggalDaftar}</p>
+                    <p><span className="font-semibold">Status:</span> {data.status}</p>
+                    {data.pesan && <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-200">{data.pesan}</p>}
+                    <div className="mt-4">
+                        <a
+                            href={`/api/ppdb/pdf?nisn=${encodeURIComponent(data.id)}`}
+                            className="inline-flex items-center gap-2 rounded-xl border border-emerald-600 px-4 py-2 text-xs font-semibold text-emerald-700"
+                        >
+                            Download Formulir
+                        </a>
                     </div>
                 </div>
             )}
         </div>
-    )
-}
+    );
+};
 
-export default PPDB;
+const ListTab: React.FC = () => {
+    const [items, setItems] = useState<PPDBListItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchList = async () => {
+            try {
+                const res = await fetch('/api/ppdb/list');
+                const json = await res.json();
+                setItems(Array.isArray(json) ? json : []);
+            } catch (error) {
+                console.error('Failed to fetch list', error);
+                setItems([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchList();
+    }, []);
+
+    return (
+        <div className="p-6 md:p-10">
+            <h3 className="text-2xl font-semibold text-emerald-900 dark:text-white mb-4">Daftar Pendaftar</h3>
+            {loading ? (
+                <p className="text-sm text-gray-500">Memuat data...</p>
+            ) : items.length === 0 ? (
+                <p className="text-sm text-gray-500">Belum ada pendaftar.</p>
+            ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {items.map((item) => (
+                        <div key={item.id} className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5">
+                            <p className="text-sm font-semibold text-emerald-900 dark:text-white">{item.namaLengkap}</p>
+                            <p className="text-xs text-gray-500">NISN: {item.nisn || '-'}</p>
+                            <p className="text-xs text-emerald-700">Status: {item.status}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+type PPDBFormState = Omit<PPDBFormData, 'files'>;
+
+const FormTab: React.FC<{ ppdbOpen: boolean; activeWave: PPDBWave | null }> = ({ ppdbOpen, activeWave }) => {
+    const router = useRouter();
+    const [step, setStep] = useState<FormStep>(0);
+    const [submitting, setSubmitting] = useState(false);
+    const [errors, setErrors] = useState<FormErrors>({});
+    const [files, setFiles] = useState<Record<FileType, string>>({
+        kk: '',
+        akta_kelahiran: '',
+        ktp_wali: '',
+        pas_foto: '',
+        nisn: '',
+        ijazah_rapor: '',
+    });
+    const [form, setForm] = useState<PPDBFormState>({
+        namaLengkap: '',
+        nik: '',
+        nisn: '',
+        tempatLahir: '',
+        tanggalLahir: '',
+        jenisKelamin: 'L',
+        alamat: '',
+        namaAyah: '',
+        pekerjaanAyah: '',
+        namaIbu: '',
+        pekerjaanIbu: '',
+        noHp: '',
+    });
+
+    const updateField = (field: keyof typeof form, value: string) => {
+        setForm((prev) => ({ ...prev, [field]: value }));
+        if (errors[field]) {
+            setErrors((prev) => {
+                const next = { ...prev };
+                delete next[field];
+                return next;
+            });
+        }
+    };
+
+    const validateNik = (value: string) => /^\d{16}$/.test(value);
+    const validateNisn = (value: string) => /^\d{10}$/.test(value);
+
+    const validateStep = (targetStep: FormStep) => {
+        const nextErrors: FormErrors = {};
+        if (targetStep === 0) {
+            if (!form.namaLengkap) nextErrors.namaLengkap = 'Nama lengkap wajib diisi';
+            if (!form.nik) nextErrors.nik = 'NIK wajib diisi';
+            if (form.nik && !validateNik(form.nik)) nextErrors.nik = 'NIK harus 16 digit angka';
+            if (!form.nisn) nextErrors.nisn = 'NISN wajib diisi';
+            if (form.nisn && !validateNisn(form.nisn)) nextErrors.nisn = 'NISN harus 10 digit angka';
+            if (!form.tempatLahir) nextErrors.tempatLahir = 'Tempat lahir wajib diisi';
+            if (!form.tanggalLahir) nextErrors.tanggalLahir = 'Tanggal lahir wajib diisi';
+            if (!form.jenisKelamin) nextErrors.jenisKelamin = 'Jenis kelamin wajib diisi';
+            if (!form.alamat) nextErrors.alamat = 'Alamat wajib diisi';
+        }
+        if (targetStep === 1) {
+            if (!form.namaAyah) nextErrors.namaAyah = 'Nama ayah wajib diisi';
+            if (!form.pekerjaanAyah) nextErrors.pekerjaanAyah = 'Pekerjaan ayah wajib diisi';
+            if (!form.namaIbu) nextErrors.namaIbu = 'Nama ibu wajib diisi';
+            if (!form.pekerjaanIbu) nextErrors.pekerjaanIbu = 'Pekerjaan ibu wajib diisi';
+            if (!form.noHp) nextErrors.noHp = 'Nomor HP/WhatsApp wajib diisi';
+        }
+        if (targetStep === 2) {
+            (Object.keys(files) as FileType[]).forEach((key) => {
+                if (!files[key]) nextErrors[key] = 'Berkas wajib diupload';
+            });
+        }
+
+        setErrors(nextErrors);
+        return Object.keys(nextErrors).length === 0;
+    };
+
+    const handleNext = () => {
+        if (!ppdbOpen) return;
+        if (!validateStep(step)) return;
+        setStep((prev) => (prev + 1) as FormStep);
+    };
+
+    const handleBack = () => setStep((prev) => (prev - 1) as FormStep);
+
+    const handleSubmit = async () => {
+        const valid = validateStep(2);
+        if (!valid) return;
+        setSubmitting(true);
+        try {
+            const payload: PPDBFormData = {
+                ...form,
+                files: (Object.keys(files) as FileType[]).map((key) => ({
+                    fileType: key,
+                    fileUrl: files[key],
+                })),
+            };
+            await api.submitPPDB(payload);
+            router.push(`/ppdb/sukses?nisn=${encodeURIComponent(form.nisn)}`);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Gagal mengirim pendaftaran');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const stepLabels = useMemo(() => ['Data Siswa', 'Orang Tua', 'Berkas', 'Review'], []);
+
+    return (
+        <div className="p-6 md:p-10 space-y-6">
+            {!ppdbOpen && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                    PPDB sedang ditutup. Silakan menunggu gelombang dibuka.
+                </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-4">
+                {stepLabels.map((label, index) => (
+                    <div
+                        key={label}
+                        className={`rounded-2xl px-4 py-3 text-xs font-semibold uppercase tracking-wider border ${
+                            step === index ? 'bg-emerald-600 text-white border-emerald-600' : 'border-emerald-100 text-emerald-700'
+                        }`}
+                    >
+                        {index + 1}. {label}
+                    </div>
+                ))}
+            </div>
+
+            {step === 0 && (
+                <div className="grid gap-5">
+                    <SectionTitle title="Data Calon Siswa" />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <InputField
+                            label="Nama Lengkap"
+                            value={form.namaLengkap}
+                            onChange={(value) => updateField('namaLengkap', value)}
+                            error={errors.namaLengkap}
+                            placeholder="Sesuai Akta Kelahiran"
+                        />
+                        <InputField
+                            label="NIK (16 digit)"
+                            value={form.nik}
+                            onChange={(value) => updateField('nik', value.replace(/\D/g, ''))}
+                            error={errors.nik}
+                            placeholder="Contoh: 3505xxxxxxxxxxxx"
+                            onBlur={() => {
+                                if (form.nik && !validateNik(form.nik)) {
+                                    setErrors((prev) => ({ ...prev, nik: 'NIK harus 16 digit angka' }));
+                                }
+                            }}
+                        />
+                        <InputField
+                            label="NISN"
+                            value={form.nisn}
+                            onChange={(value) => updateField('nisn', value.replace(/\D/g, ''))}
+                            error={errors.nisn}
+                            placeholder="Nomor Induk Siswa Nasional"
+                            onBlur={() => {
+                                if (form.nisn && !validateNisn(form.nisn)) {
+                                    setErrors((prev) => ({ ...prev, nisn: 'NISN harus 10 digit angka' }));
+                                }
+                            }}
+                        />
+                        <InputField
+                            label="Tempat Lahir"
+                            value={form.tempatLahir}
+                            onChange={(value) => updateField('tempatLahir', value)}
+                            error={errors.tempatLahir}
+                            placeholder="Kota/Kabupaten"
+                        />
+                        <InputField
+                            label="Tanggal Lahir"
+                            value={form.tanggalLahir}
+                            type="date"
+                            onChange={(value) => updateField('tanggalLahir', value)}
+                            error={errors.tanggalLahir}
+                        />
+                        <SelectField
+                            label="Jenis Kelamin"
+                            value={form.jenisKelamin}
+                            onChange={(value) => updateField('jenisKelamin', value)}
+                            error={errors.jenisKelamin}
+                            options={[
+                                { value: 'L', label: 'Laki-laki' },
+                                { value: 'P', label: 'Perempuan' },
+                            ]}
+                        />
+                    </div>
+                    <InputField
+                        label="Alamat Lengkap"
+                        value={form.alamat}
+                        onChange={(value) => updateField('alamat', value)}
+                        error={errors.alamat}
+                        placeholder="Dusun/Desa, Kecamatan, Kabupaten"
+                        multiline
+                    />
+                </div>
+            )}
+
+            {step === 1 && (
+                <div className="grid gap-5">
+                    <SectionTitle title="Data Orang Tua / Wali" />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <InputField
+                            label="Nama Ayah"
+                            value={form.namaAyah}
+                            onChange={(value) => updateField('namaAyah', value)}
+                            error={errors.namaAyah}
+                        />
+                        <InputField
+                            label="Pekerjaan Ayah"
+                            value={form.pekerjaanAyah}
+                            onChange={(value) => updateField('pekerjaanAyah', value)}
+                            error={errors.pekerjaanAyah}
+                        />
+                        <InputField
+                            label="Nama Ibu"
+                            value={form.namaIbu}
+                            onChange={(value) => updateField('namaIbu', value)}
+                            error={errors.namaIbu}
+                        />
+                        <InputField
+                            label="Pekerjaan Ibu"
+                            value={form.pekerjaanIbu}
+                            onChange={(value) => updateField('pekerjaanIbu', value)}
+                            error={errors.pekerjaanIbu}
+                        />
+                        <InputField
+                            label="Nomor HP/WhatsApp"
+                            value={form.noHp}
+                            onChange={(value) => updateField('noHp', value.replace(/\s+/g, ''))}
+                            error={errors.noHp}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {step === 2 && (
+                <div className="grid gap-6">
+                    <SectionTitle title="Upload Berkas" subtitle="Format: JPG/PNG. Maksimal 2MB per file." />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {(Object.keys(FILE_LABELS) as FileType[]).map((key) => (
+                            <FileUploadCard
+                                key={key}
+                                label={FILE_LABELS[key]}
+                                value={files[key]}
+                                error={errors[key]}
+                                onUploaded={(url) =>
+                                    setFiles((prev) => ({
+                                        ...prev,
+                                        [key]: url,
+                                    }))
+                                }
+                            />
+                        ))}
+                    </div>
+                    {Object.keys(errors).some((key) => key in FILE_LABELS) && (
+                        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                            Semua berkas wajib diupload.
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {step === 3 && (
+                <div className="grid gap-5">
+                    <SectionTitle title="Review Data" />
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 text-sm text-emerald-900/80">
+                        <div className="grid gap-2 md:grid-cols-2">
+                            <p><span className="font-semibold">Nama:</span> {form.namaLengkap}</p>
+                            <p><span className="font-semibold">NIK:</span> {form.nik}</p>
+                            <p><span className="font-semibold">NISN:</span> {form.nisn}</p>
+                            <p><span className="font-semibold">TTL:</span> {form.tempatLahir}, {form.tanggalLahir}</p>
+                            <p><span className="font-semibold">Jenis Kelamin:</span> {form.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</p>
+                            <p><span className="font-semibold">Alamat:</span> {form.alamat}</p>
+                            <p><span className="font-semibold">Nama Ayah:</span> {form.namaAyah}</p>
+                            <p><span className="font-semibold">Pekerjaan Ayah:</span> {form.pekerjaanAyah}</p>
+                            <p><span className="font-semibold">Nama Ibu:</span> {form.namaIbu}</p>
+                            <p><span className="font-semibold">Pekerjaan Ibu:</span> {form.pekerjaanIbu}</p>
+                            <p><span className="font-semibold">No. HP:</span> {form.noHp}</p>
+                        </div>
+                        <div className="mt-4 text-xs text-emerald-700">Berkas terunggah: {Object.values(files).filter(Boolean).length} file</div>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-emerald-100">
+                <button
+                    onClick={handleBack}
+                    disabled={step === 0}
+                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-600 px-4 py-2 text-xs font-semibold text-emerald-700 disabled:opacity-50"
+                >
+                    <ArrowLeft size={14} /> Kembali
+                </button>
+                {step < 3 ? (
+                    <button
+                        onClick={handleNext}
+                        disabled={!ppdbOpen}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                        Selanjutnya <ArrowRight size={14} />
+                    </button>
+                ) : (
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting || !ppdbOpen}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                        {submitting ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                        Kirim Pendaftaran
+                    </button>
+                )}
+            </div>
+
+            {step < 3 && Object.keys(errors).length > 0 && (
+                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">
+                    <AlertTriangle size={14} className="inline-block mr-2" />
+                    Pastikan semua field wajib diisi dengan benar.
+                </div>
+            )}
+
+            {activeWave && (
+                <p className="text-xs text-emerald-600">Gelombang aktif: {activeWave.name} ({activeWave.startDate} - {activeWave.endDate})</p>
+            )}
+        </div>
+    );
+};
+
+const SectionTitle: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+    <div>
+        <h3 className="text-lg font-semibold text-emerald-900 dark:text-white">{title}</h3>
+        {subtitle && <p className="text-xs text-emerald-700/70">{subtitle}</p>}
+    </div>
+);
+
+const InputField: React.FC<{
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    error?: string;
+    type?: string;
+    multiline?: boolean;
+    onBlur?: () => void;
+}> = ({ label, value, onChange, placeholder, error, type = 'text', multiline, onBlur }) => (
+    <div className="flex flex-col gap-2">
+        <label className="text-xs font-semibold text-emerald-900">{label} *</label>
+        {multiline ? (
+            <textarea
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onBlur={onBlur}
+                className="rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none"
+                rows={3}
+                placeholder={placeholder}
+            />
+        ) : (
+            <input
+                type={type}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onBlur={onBlur}
+                className="rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder={placeholder}
+            />
+        )}
+        {error && <span className="text-[11px] text-red-600">{error}</span>}
+    </div>
+);
+
+const SelectField: React.FC<{
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    error?: string;
+}> = ({ label, value, onChange, options, error }) => (
+    <div className="flex flex-col gap-2">
+        <label className="text-xs font-semibold text-emerald-900">{label} *</label>
+        <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none"
+        >
+            {options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                </option>
+            ))}
+        </select>
+        {error && <span className="text-[11px] text-red-600">{error}</span>}
+    </div>
+);
+
+const FileUploadCard: React.FC<{
+    label: string;
+    value: string;
+    error?: string;
+    onUploaded: (url: string) => void;
+}> = ({ label, value, error, onUploaded }) => {
+    const preset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '';
+    const canUpload = Boolean(preset);
+
+    return (
+        <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold text-emerald-900 mb-3">{label}</p>
+            {value ? (
+                <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-emerald-50 mb-3">
+                    <img src={value} alt={label} className="h-full w-full object-cover" />
+                </div>
+            ) : (
+                <div className="flex items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 p-6 text-xs text-emerald-700 mb-3">
+                    Belum ada berkas
+                </div>
+            )}
+            {canUpload ? (
+                <CldUploadWidget
+                    uploadPreset={preset}
+                    options={{
+                        sources: ['local'],
+                        clientAllowedFormats: ['png', 'jpg', 'jpeg'],
+                        maxFileSize: 2000000,
+                        multiple: false,
+                    }}
+                    onSuccess={(result: any) => {
+                        const info = result?.info as any;
+                        const url = info?.secure_url || info?.url;
+                        if (url) onUploaded(url);
+                    }}
+                >
+                    {({ open }) => (
+                        <button
+                            type="button"
+                            onClick={() => open?.()}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
+                        >
+                            <Upload size={14} /> Upload
+                        </button>
+                    )}
+                </CldUploadWidget>
+            ) : (
+                <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gray-300 px-4 py-2 text-xs font-semibold text-gray-600"
+                    disabled
+                >
+                    <Upload size={14} /> Upload belum aktif
+                </button>
+            )}
+            {error && <p className="mt-2 text-[11px] text-red-600">{error}</p>}
+        </div>
+    );
+};

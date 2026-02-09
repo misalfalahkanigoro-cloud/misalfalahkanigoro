@@ -3,11 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Calendar, CheckCircle, Shield, Award, Heart, Star, BookOpen, Users, Camera } from 'lucide-react';
-import PublicHero from '@/components/PublicHero';
 import { api } from '@/lib/api';
-import type { Highlight, NewsItem, Activity, NewsListResponse, HeadmasterGreeting, SiteBanner } from '@/lib/types';
+import type { NewsPost, HeadmasterGreeting, SiteBanner, Activity } from '@/lib/types';
+import PublicHero from '@/components/PublicHero';
 
-// Icon mapping for highlights
+// Hardcoded Highlights for now (faster load, less DB requests)
+const HIGHLIGHTS = [
+    { id: 1, title: 'Akreditasi A', description: 'Terakreditasi A oleh BAN-SM dengan nilai memuaskan.', icon: 'Star' },
+    { id: 2, title: 'Tahfidz Quran', description: 'Program unggulan tahfidz Juz 30 dan surat pilihan.', icon: 'BookOpen' },
+    { id: 3, title: 'Ekstrakurikuler', description: 'Beragam kegiatan untuk mengembangkan bakat siswa.', icon: 'Users' },
+];
+
 const iconMap: Record<string, React.ReactNode> = {
     Star: <Star className="w-8 h-8 text-yellow-500" />,
     BookOpen: <BookOpen className="w-8 h-8 text-primary" />,
@@ -15,11 +21,8 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 const Home: React.FC = () => {
-    const [highlights, setHighlights] = useState<Highlight[]>([]);
-    const [news, setNews] = useState<NewsItem[]>([]);
-    const [activities, setActivities] = useState<Activity[]>([]);
+    const [news, setNews] = useState<NewsPost[]>([]);
     const [greeting, setGreeting] = useState<HeadmasterGreeting | null>(null);
-    const [banner, setBanner] = useState<SiteBanner | null>(null);
     const [schoolName] = useState('MIS Al-Falah Kanigoro');
     const [loading, setLoading] = useState(true);
 
@@ -27,20 +30,17 @@ const Home: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [highlightsData, newsData, activitiesData, greetingData, bannersData] = await Promise.all([
-                    api.getHighlights(),
+                // Parallel fetching
+                const [newsData, greetingData] = await Promise.all([
                     api.getNews({ page: 1, pageSize: 3 }),
-                    api.getActivities(),
                     api.getHeadmasterGreeting(),
-                    api.getSiteBanners('home'),
                 ]);
 
-                setHighlights(highlightsData as Highlight[]);
-                setNews(((newsData as NewsListResponse).items || []));
-                setActivities(activitiesData as Activity[]);
-                setGreeting((greetingData as HeadmasterGreeting) || null);
-                const banners = bannersData as SiteBanner[];
-                setBanner(banners && banners.length ? banners[0] : null);
+                // Check structure of newsData response
+                const newsItems = (newsData as any).items || newsData || [];
+                setNews(newsItems);
+
+                setGreeting(greetingData as HeadmasterGreeting || null);
             } catch (error) {
                 console.error('Error fetching homepage data:', error);
             } finally {
@@ -53,24 +53,35 @@ const Home: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            </div>
+            <>
+                <PublicHero />
+                <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+            </>
         );
     }
 
     return (
         <>
             <PublicHero />
-
-            {/* Highlights / Stats */}
+            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
+                <div className="container mx-auto px-4 py-8 md:py-10">
+                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
+                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
+                        Halaman
+                    </div>
+                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Beranda</h1>
+                </div>
+            </section>
+            {/* Highlights / Stats (Mocked for performance/simplicity) */}
             <section className="py-20 bg-white dark:bg-gray-900 relative z-20 transition-colors duration-200">
                 <div className="container mx-auto px-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {highlights.map((item) => (
+                        {HIGHLIGHTS.map((item) => (
                             <div key={item.id} className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-xl border-t-4 border-primary hover:-translate-y-1 transition-all duration-300">
                                 <div className="mb-4 bg-green-50 dark:bg-green-900/30 w-16 h-16 rounded-full flex items-center justify-center">
-                                    {iconMap[item.icon] || <Star className="w-8 h-8 text-primary" />}
+                                    {iconMap[item.icon]}
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{item.title}</h3>
                                 <p className="text-gray-600 dark:text-gray-300 leading-relaxed">{item.description}</p>
@@ -132,39 +143,19 @@ const Home: React.FC = () => {
                                 ) : (
                                     <>
                                         <p>
-                                            "Assalamu'alaikum Warahmatullahi Wabarakatuh. Puji syukur kita panjatkan ke hadirat Allah SWT. {schoolName} hadir sebagai lembaga pendidikan yang berkomitmen mencetak generasi yang tidak hanya cerdas secara intelektual, namun juga matang secara spiritual."
+                                            "Assalamu'alaikum Warahmatullahi Wabarakatuh. Selamat datang di website resmi {schoolName}."
                                         </p>
                                         <p>
-                                            "Kami memadukan kurikulum nasional dengan nilai-nilai pesantren untuk membentuk karakter siswa yang berakhlak karimah, mandiri, dan siap menghadapi tantangan zaman."
+                                            "Kami berkomitmen mencetak generasi yang cerdas, berakhlak mulia, dan siap menghadapi tantangan zaman dengan landasan iman dan taqwa."
                                         </p>
                                     </>
                                 )}
                             </div>
                             <div className="mt-8">
-                                <p className="font-bold text-gray-900 dark:text-white">{greeting?.headmasterName || 'Drs. H. Ahmad Fauzi, M.Pd'}</p>
+                                <p className="font-bold text-gray-900 dark:text-white">{greeting?.headmasterName || 'Kepala Madrasah'}</p>
                                 <p className="text-gray-500 dark:text-gray-400">{greeting?.headmasterTitle || 'Kepala Madrasah'}</p>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Galeri Singkat */}
-            <section className="py-12 bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
-                <div className="container mx-auto px-4">
-                    <div className="flex justify-between items-end mb-8">
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Galeri Kegiatan</h2>
-                        <Link href="/kesiswaan" className="text-primary dark:text-green-400 font-semibold text-sm hover:underline">Lihat Semua</Link>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {activities.slice(0, 4).map((act) => (
-                            <div key={act.id} className="relative rounded-lg overflow-hidden group aspect-square">
-                                <img src={act.imageUrl || 'https://picsum.photos/600/400'} alt={act.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <Camera className="text-white" size={24} />
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
             </section>
@@ -175,7 +166,7 @@ const Home: React.FC = () => {
                     <div className="flex justify-between items-end mb-10">
                         <div>
                             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Kabar Madrasah</h2>
-                            <p className="text-gray-500 dark:text-gray-400">Berita, prestasi, dan agenda terbaru.</p>
+                            <p className="text-gray-500 dark:text-gray-400">Berita dan kegiatan terbaru.</p>
                         </div>
                         <Link href="/berita" className="hidden md:flex items-center text-primary dark:text-green-400 font-semibold hover:underline">
                             Lihat Semua <ArrowRight size={16} className="ml-2" />
@@ -183,29 +174,39 @@ const Home: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {news.map((item) => (
-                            <article key={item.id} className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 flex flex-col h-full">
-                                <div className="relative h-48 overflow-hidden">
-                                    <img src={item.thumbnailUrl || 'https://picsum.photos/800/600'} alt={item.title} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" />
-                                    <span className="absolute top-4 left-4 bg-primary text-white text-xs px-3 py-1 rounded-full">{item.category}</span>
-                                </div>
-                                <div className="p-6 flex flex-col flex-grow">
-                                    <div className="flex items-center text-gray-400 text-xs mb-3">
-                                        <Calendar size={14} className="mr-2" />
-                                        {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        {news.length > 0 ? (
+                            news.map((item) => (
+                                <article key={item.id} className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 flex flex-col h-full">
+                                    <div className="relative h-48 overflow-hidden">
+                                        <img
+                                            src={item.coverUrl || 'https://picsum.photos/800/600'}
+                                            alt={item.title}
+                                            className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
+                                        />
+                                        <span className="absolute top-4 left-4 bg-primary text-white text-xs px-3 py-1 rounded-full">Berita</span>
                                     </div>
-                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 hover:text-primary dark:hover:text-green-400 transition-colors line-clamp-2">
-                                        <Link href={`/berita/${item.slug}`}>{item.title}</Link>
-                                    </h3>
-                                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-3 flex-grow">
-                                        {item.excerpt}
-                                    </p>
-                                    <Link href={`/berita/${item.slug}`} className="text-primary dark:text-green-400 font-medium text-sm hover:underline mt-auto inline-block">
-                                        Baca Selengkapnya
-                                    </Link>
-                                </div>
-                            </article>
-                        ))}
+                                    <div className="p-6 flex flex-col flex-grow">
+                                        <div className="flex items-center text-gray-400 text-xs mb-3">
+                                            <Calendar size={14} className="mr-2" />
+                                            {new Date(item.publishedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                        </div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 hover:text-primary dark:hover:text-green-400 transition-colors line-clamp-2">
+                                            <Link href={`/berita/${item.slug}`}>{item.title}</Link>
+                                        </h3>
+                                        <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-3 flex-grow">
+                                            {item.excerpt || item.content?.substring(0, 100) + '...'}
+                                        </p>
+                                        <Link href={`/berita/${item.slug}`} className="text-primary dark:text-green-400 font-medium text-sm hover:underline mt-auto inline-block">
+                                            Baca Selengkapnya
+                                        </Link>
+                                    </div>
+                                </article>
+                            ))
+                        ) : (
+                            <div className="col-span-3 text-center py-10 bg-gray-50 rounded-lg">
+                                <p className="text-gray-500">Belum ada berita terbaru.</p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-8 text-center md:hidden">
@@ -219,22 +220,21 @@ const Home: React.FC = () => {
             {/* PPDB CTA Section */}
             <section
                 className="py-20 text-white relative overflow-hidden transition-colors duration-200 bg-primary dark:bg-green-800"
-                style={{ backgroundColor: banner?.backgroundColor || undefined }}
             >
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-white/5"></div>
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-60 h-60 rounded-full bg-white/5"></div>
 
-                <div className="container mx-auto px-4 text-center relative z-10" style={{ color: banner?.textColor || undefined }}>
-                    <h2 className="text-3xl md:text-5xl font-bold mb-6">{banner?.title || 'Penerimaan Peserta Didik Baru'}</h2>
-                    <p className="text-green-100 text-lg md:text-xl max-w-2xl mx-auto mb-10" style={{ color: banner?.textColor || undefined }}>
-                        {banner?.description || `Bergabunglah bersama keluarga besar ${schoolName}. Mari wujudkan generasi Qur'ani yang cerdas dan berakhlak mulia.`}
+                <div className="container mx-auto px-4 text-center relative z-10">
+                    <h2 className="text-3xl md:text-5xl font-bold mb-6">Penerimaan Peserta Didik Baru</h2>
+                    <p className="text-green-100 text-lg md:text-xl max-w-2xl mx-auto mb-10">
+                        {`Bergabunglah bersama keluarga besar ${schoolName}. Mari wujudkan generasi Qur'ani yang cerdas dan berakhlak mulia.`}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <Link
-                            href={banner?.buttonLink || '/ppdb'}
+                            href="/ppdb"
                             className="px-8 py-4 bg-white text-primary rounded-full font-bold text-lg hover:bg-gray-100 transition shadow-lg"
                         >
-                            {banner?.buttonText || 'Daftar Sekarang'}
+                            Daftar Sekarang
                         </Link>
                         <Link
                             href="/kontak"
