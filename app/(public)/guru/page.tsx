@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -46,23 +46,6 @@ const Guru: React.FC = () => {
                             <div className="p-6">
                                 <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1">{teacher.name}</h3>
                                 <p className="text-primary dark:text-green-400 font-medium text-sm">{teacher.position}</p>
-                            </div>
-                        </div>
-                    ))}
-
-                    {/* Mock more items for demo purposes */}
-                    {[5, 6, 7, 8].map((i) => (
-                        <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden text-center">
-                            <div className="h-64 overflow-hidden bg-gray-200 dark:bg-gray-700">
-                                <img
-                                    src={`https://picsum.photos/id/${1030 + i}/300/400`}
-                                    alt="Guru"
-                                    className="w-full h-full object-cover object-top opacity-80"
-                                />
-                            </div>
-                            <div className="p-6">
-                                <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1">Guru Mata Pelajaran</h3>
-                                <p className="text-gray-500 dark:text-gray-400 text-sm">Staf Pengajar</p>
                             </div>
                         </div>
                     ))}
