@@ -178,9 +178,9 @@ const SidebarAdmin: React.FC = () => {
 
     const SidebarContent = (
         <div className="flex h-full flex-col gap-8 p-6 pb-8 overflow-y-auto admin-scrollbar bg-gradient-to-b from-white/95 to-white dark:from-[#0B0F0C] dark:to-[#0B0F0C]">
-            <div className="flex items-center justify-between gap-3">
+            <div className="sticky top-0 z-20 -mx-1 flex flex-col items-stretch gap-3 rounded-2xl border border-emerald-900/10 bg-white/95 p-1 backdrop-blur dark:border-white/10 dark:bg-[#0B0F0C]/95">
                 <Link
-                    href="/admin/dashboard"
+                    href="/admin/akunadmin"
                     className="inline-flex items-center gap-3 rounded-2xl bg-emerald-600 px-3 py-2 text-white shadow-lg shadow-emerald-600/30"
                 >
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
@@ -193,10 +193,21 @@ const SidebarAdmin: React.FC = () => {
                 </Link>
                 <button
                     onClick={toggleTheme}
-                    className="h-10 w-10 rounded-xl border border-emerald-900/10 bg-white text-emerald-700 shadow-sm transition hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:bg-white/10 dark:text-white"
                     aria-label="Toggle theme"
+                    aria-pressed={isDark}
+                    title={isDark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
+                    className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border px-2.5 pr-3 text-xs font-semibold shadow-sm transition ${isDark
+                        ? 'border-emerald-300/70 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-100'
+                        : 'border-emerald-900/10 bg-white text-emerald-700 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:bg-white/10 dark:text-white'
+                        }`}
                 >
-                    {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-xl transition ${isDark
+                        ? 'bg-emerald-600 text-white shadow'
+                        : 'bg-emerald-100 text-emerald-700 dark:bg-white/15 dark:text-white'
+                        }`}>
+                        {isDark ? <Sun size={14} /> : <Moon size={14} />}
+                    </span>
+                    <span className="tracking-wide">{isDark ? 'TERANG' : 'GELAP'}</span>
                 </button>
             </div>
 

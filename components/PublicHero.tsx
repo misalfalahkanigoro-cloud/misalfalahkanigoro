@@ -6,6 +6,16 @@ import { Loader2, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { HeroItem } from '@/lib/types';
 
+const outlineBackTitle: React.CSSProperties = {
+    WebkitTextStroke: '1.8px rgba(0, 0, 0, 0.7)',
+    color: 'transparent',
+};
+
+const outlineBackSoft: React.CSSProperties = {
+    WebkitTextStroke: '1.2px rgba(0, 0, 0, 0.62)',
+    color: 'transparent',
+};
+
 const PublicHero: React.FC = () => {
     const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -107,29 +117,48 @@ const PublicHero: React.FC = () => {
                                 alt={slide.title}
                                 className="w-full h-full object-cover"
                             />
-                            {/* Optional Gradient Overlay for text readability */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
+                            {/* Black bottom gradient overlay (bottom -> top) */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
                         </div>
 
                         {/* Content */}
                         <div className="relative z-20 container mx-auto px-4 h-full flex items-end pb-20 md:pb-32">
                             <div className="max-w-4xl animate-fadeInUp">
-                                <span className="inline-block px-3 py-1 mb-4 text-xs font-bold tracking-wider uppercase bg-primary text-white rounded-full">
-                                    {slide.type === 'news' ? 'Berita' :
-                                        slide.type === 'publication' ? 'Publikasi' :
-                                            slide.type === 'achievement' ? 'Prestasi' :
-                                                slide.type === 'gallery' ? 'Galeri' : 'Info'}
+                                <span className="relative mb-4 inline-block rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
+                                    <span aria-hidden className="absolute inset-0 select-none" style={outlineBackSoft}>
+                                        {slide.type === 'news' ? 'Berita' :
+                                            slide.type === 'publication' ? 'Publikasi' :
+                                                slide.type === 'achievement' ? 'Prestasi' :
+                                                    slide.type === 'gallery' ? 'Galeri' : 'Info'}
+                                    </span>
+                                    <span className="relative">
+                                        {slide.type === 'news' ? 'Berita' :
+                                            slide.type === 'publication' ? 'Publikasi' :
+                                                slide.type === 'achievement' ? 'Prestasi' :
+                                                    slide.type === 'gallery' ? 'Galeri' : 'Info'}
+                                    </span>
                                 </span>
-                                <h1 className="text-3xl md:text-5xl lg:text-7xl font-black drop-shadow-lg leading-tight mb-2">
-                                    {slide.title}
+                                <h1 className="relative mb-2 text-3xl font-black leading-tight drop-shadow-lg md:text-5xl lg:text-7xl">
+                                    <span aria-hidden className="absolute inset-0 select-none" style={outlineBackTitle}>
+                                        {slide.title}
+                                    </span>
+                                    <span className="relative text-white">{slide.title}</span>
                                 </h1>
                                 {slide.description && (
-                                    <p className="text-sm md:text-lg text-gray-200 mb-4 line-clamp-2 max-w-2xl">
-                                        {slide.description}
+                                    <p className="relative mb-4 max-w-2xl line-clamp-2 text-sm text-gray-200 md:text-lg">
+                                        <span aria-hidden className="absolute inset-0 select-none" style={outlineBackSoft}>
+                                            {slide.description}
+                                        </span>
+                                        <span className="relative">{slide.description}</span>
                                     </p>
                                 )}
-                                <p className="text-sm md:text-base text-gray-300 mb-6">
-                                    {new Date(slide.date).toLocaleDateString('id-ID', { dateStyle: 'long' })}
+                                <p className="relative mb-6 text-sm text-gray-300 md:text-base">
+                                    <span aria-hidden className="absolute inset-0 select-none" style={outlineBackSoft}>
+                                        {new Date(slide.date).toLocaleDateString('id-ID', { dateStyle: 'long' })}
+                                    </span>
+                                    <span className="relative">
+                                        {new Date(slide.date).toLocaleDateString('id-ID', { dateStyle: 'long' })}
+                                    </span>
                                 </p>
                                 <div className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black font-bold rounded-lg hover:bg-emerald-500 hover:text-white transition-all duration-300 shadow-xl">
                                     Baca Selengkapnya <ArrowRight size={18} />

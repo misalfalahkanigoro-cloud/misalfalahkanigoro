@@ -1,1 +1,2 @@
-banyak eror
+cek duplikasi field, field tidak terpakai atau tidak terpanggil di koding database.sql dan beri saran gimana akomodir databasenya dan panel admin biar tidak rancu
+hei buat metode upload ke cloudinary langsung untuk file media, upload ke supabase storage jika non media dan langsung simpan  url jika embed dan sesuaikan logika 
