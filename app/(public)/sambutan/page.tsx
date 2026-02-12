@@ -89,7 +89,7 @@ const SambutanPage: React.FC = () => {
 
                 {!loading && !error && greeting && (
                     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
-                        <article className="space-y-8">
+                        <article className="order-2 space-y-8 lg:order-1">
                             {richContent ? (
                                 <div
                                     className="prose max-w-none prose-emerald prose-h2:font-semibold prose-h2:text-emerald-900 prose-p:text-emerald-900/80 prose-blockquote:border-emerald-300 dark:prose-invert dark:prose-h2:text-white"
@@ -102,7 +102,7 @@ const SambutanPage: React.FC = () => {
                             )}
                         </article>
 
-                        <aside className="space-y-6">
+                        <aside className="order-1 space-y-6 lg:order-2">
                             <div className="rounded-3xl border border-emerald-100 bg-white/80 p-6 shadow-lg dark:border-white/10 dark:bg-white/5">
                                 <div className="relative overflow-hidden rounded-2xl bg-emerald-50 dark:bg-white/10">
                                     {photoUrl ? (
