@@ -1,0 +1,719 @@
+generator client {
+  provider        = "prisma-client-js"
+  engineType      = "binary"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model academic_pages {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title             String
+  subtitle          String?
+  content           String?
+  is_active         Boolean?            @default(true)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  academic_sections academic_sections[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model academic_sections {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  page_id        String         @db.Uuid
+  title          String
+  body           String?
+  display_order  Int?           @default(0)
+  created_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  academic_pages academic_pages @relation(fields: [page_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model achievements {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  slug         String    @unique
+  description  String?
+  event_name   String?
+  event_level  String?
+  rank         String?
+  achieved_at  DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  is_published Boolean?  @default(true)
+  is_pinned    Boolean?  @default(false)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model activities {
+  id        BigInt   @id @default(autoincrement())
+  title     String
+  imageUrl  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([isActive], map: "activities_active_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model admin_publicweb {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username      String   @unique
+  password_hash String
+  user_role     String   @default("admin")
+  full_name     String
+  email         String?
+  phone         String?
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model character_programs {
+  id           BigInt   @id @default(autoincrement())
+  name         String
+  description  String
+  icon         String?
+  frequency    String?
+  displayorder Int?     @default(0)
+  isactive     Boolean? @default(true)
+  createdat    DateTime @default(now()) @db.Timestamptz(6)
+  updatedat    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([isactive, displayorder], map: "idx_character_programs_active")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model contact_page {
+  id              String   @id @default("main")
+  address         String
+  phone           String?
+  email           String
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @db.Timestamptz(6)
+  whatsappList    Json     @default("[]")
+  adminWhatsappId String?
+  mapEmbedHtml    String
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model download_files {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  download_id      String    @db.Uuid
+  file_name        String
+  file_type        String?
+  file_size_kb     Int?
+  storage_provider String?   @default("r2")
+  storage_bucket   String?
+  storage_path     String
+  public_url       String
+  display_order    Int?      @default(0)
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  downloads        downloads @relation(fields: [download_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([download_id, display_order], map: "idx_download_files_download_id")
+  @@index([storage_bucket, storage_path], map: "idx_download_files_storage")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model downloads {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                 String
+  slug                  String           @unique
+  description           String?
+  file_storage_provider String?          @default("r2")
+  file_storage_bucket   String?
+  file_storage_path     String?
+  file_url              String?
+  file_type             String?
+  file_size_kb          Int?
+  download_count        Int?             @default(0)
+  is_published          Boolean?         @default(true)
+  is_pinned             Boolean?         @default(false)
+  created_at            DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?        @default(now()) @db.Timestamptz(6)
+  download_files        download_files[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model extracurriculars {
+  id           BigInt   @id @default(autoincrement())
+  name         String
+  description  String
+  icon         String?
+  imageurl     String?
+  schedule     String?
+  coachname    String?
+  displayorder Int?     @default(0)
+  isactive     Boolean? @default(true)
+  createdat    DateTime @default(now()) @db.Timestamptz(6)
+  updatedat    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([isactive, displayorder], map: "idx_extracurriculars_active")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model footer_quick_links {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label         String
+  href          String
+  display_order Int?     @default(0)
+  is_active     Boolean? @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model galleries {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  slug         String    @unique
+  description  String?
+  event_date   DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  is_published Boolean?  @default(true)
+  is_pinned    Boolean?  @default(false)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model graduation_students {
+  id           BigInt            @id @default(autoincrement())
+  nisn         String            @unique
+  name         String
+  className    String
+  status       graduation_status
+  averageScore Float             @default(0)
+  year         String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime          @default(now()) @db.Timestamptz(6)
+
+  @@index([year])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model headmaster_greeting {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String
+  subtitle         String?
+  content_json     Json?
+  content_html     String?
+  content_text     String?
+  headmaster_name  String
+  headmaster_title String?
+  photo_url        String?
+  is_active        Boolean? @default(true)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model hero_slides {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  imageUrl  String
+  title     String
+  subtitle  String?
+  order     Int?     @default(0)
+  isActive  Boolean? @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model highlights {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  icon        String   @default("Star")
+  title       String
+  description String
+  order       Int?     @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model history_page {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                  String                   @default("Sejarah Madrasah")
+  subtitle               String?
+  content_json           Json?
+  content_html           String?
+  content_text           String?
+  cover_image_url        String?
+  video_url              String?
+  is_active              Boolean?                 @default(true)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  history_timeline_items history_timeline_items[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model history_timeline_items {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  history_page_id  String       @db.Uuid
+  year             String
+  title            String
+  description_json Json?
+  description_html String?
+  description_text String?
+  media_url        String?
+  display_order    Int?         @default(0)
+  is_active        Boolean?     @default(true)
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime     @default(now()) @db.Timestamptz(6)
+  history_page     history_page @relation(fields: [history_page_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([history_page_id, display_order], map: "history_timeline_items_page_order_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model media_items {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity_type      String
+  entity_id        String    @db.Uuid
+  media_type       String    @default("image")
+  storage_provider String?   @default("r2")
+  storage_bucket   String?
+  storage_path     String?
+  media_url        String
+  thumbnail_url    String?
+  caption          String?
+  is_main          Boolean?  @default(false)
+  display_order    Int?      @default(0)
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([entity_type, entity_id], map: "idx_media_entity")
+  @@index([storage_bucket, storage_path], map: "idx_media_storage")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model navigation_menu {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                 String
+  href                  String?
+  parent_id             String?           @db.Uuid
+  display_order         Int?              @default(0)
+  is_active             Boolean?          @default(true)
+  icon                  String?
+  created_at            DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime          @default(now()) @db.Timestamptz(6)
+  navigation_menu       navigation_menu?  @relation("navigation_menuTonavigation_menu", fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  other_navigation_menu navigation_menu[] @relation("navigation_menuTonavigation_menu")
+
+  @@index([display_order], map: "idx_navigation_order")
+  @@index([parent_id], map: "idx_navigation_parent")
+}
+
+model page_heroes {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pageslug       String
+  title          String
+  subtitle       String?
+  imageurl       String
+  overlayopacity Float?   @default(0.5)
+  isactive       Boolean? @default(true)
+  createdat      DateTime @default(now()) @db.Timestamptz(6)
+  updatedat      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([pageslug, isactive], map: "page_heroes_slug_active_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model news_posts {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  slug         String    @unique
+  excerpt      String?
+  content      String?
+  author_name  String?   @default("Admin")
+  published_at DateTime? @default(now()) @db.Timestamptz(6)
+  is_published Boolean?  @default(true)
+  is_pinned    Boolean?  @default(false)
+  view_count   Int?      @default(0)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ppdb_files {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_id    String             @db.Uuid
+  file_type          String
+  storage_provider   String?            @default("r2")
+  storage_bucket     String?
+  storage_path       String?
+  file_url           String
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  ppdb_registrations ppdb_registrations @relation(fields: [registration_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([registration_id], map: "idx_ppdb_files_registration")
+  @@index([file_type], map: "idx_ppdb_files_type")
+  @@index([storage_bucket, storage_path], map: "idx_ppdb_files_storage")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ppdb_notifications {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_id    String?             @db.Uuid
+  wave_id            String?             @db.Uuid
+  title              String
+  message            String
+  created_at         DateTime?           @default(now()) @db.Timestamptz(6)
+  ppdb_registrations ppdb_registrations? @relation(fields: [registration_id], references: [id], onUpdate: NoAction)
+  ppdb_waves         ppdb_waves?         @relation(fields: [wave_id], references: [id], onUpdate: NoAction)
+
+  @@index([registration_id], map: "idx_ppdb_notifications_reg")
+  @@index([wave_id], map: "idx_ppdb_notifications_wave")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ppdb_registrations {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  namaLengkap        String
+  nik                String
+  nisn               String               @unique(map: "ppdb_registrations_nisn_unique", where: raw("(nisn IS NOT NULL)"))
+  tempatLahir        String
+  tanggalLahir       DateTime             @db.Date
+  jenisKelamin       gender
+  alamat             String
+  namaAyah           String
+  pekerjaanAyah      String?
+  namaIbu            String
+  pekerjaanIbu       String?
+  noHp               String
+  status             ppdb_status          @default(VERIFIKASI)
+  pesan              String?
+  tanggalDaftar      DateTime             @default(now()) @db.Timestamptz(6)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime             @default(now()) @db.Timestamptz(6)
+  wave_id            String?              @db.Uuid
+  ppdb_files         ppdb_files[]
+  ppdb_notifications ppdb_notifications[]
+  ppdb_waves         ppdb_waves?          @relation(fields: [wave_id], references: [id], onUpdate: NoAction)
+  push_subscriptions push_subscriptions[]
+
+  @@index([wave_id], map: "idx_ppdb_registrations_wave_id")
+  @@index([status, tanggalDaftar], map: "ppdb_registrations_status_date_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ppdb_waves {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  start_date         DateTime             @db.Date
+  end_date           DateTime             @db.Date
+  quota              Int?
+  is_active          Boolean?             @default(true)
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  ppdb_notifications ppdb_notifications[]
+  ppdb_registrations ppdb_registrations[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model profile_page {
+  id              String   @id @default("main")
+  descriptionJson Json?
+  descriptionHtml String?
+  descriptionText String?
+  videoUrl        String?
+  schoolName      String
+  npsn            String
+  schoolAddress   String
+  village         String
+  district        String
+  city            String
+  province        String
+  schoolStatus    String
+  educationForm   String
+  educationLevel  String
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model publications {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type         String
+  title        String
+  slug         String    @unique
+  description  String?
+  content      String?
+  published_at DateTime? @default(now()) @db.Timestamptz(6)
+  is_published Boolean?  @default(true)
+  is_pinned    Boolean?  @default(false)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model push_subscriptions {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_id    String             @db.Uuid
+  endpoint           String
+  p256dh             String
+  auth               String
+  user_agent         String?
+  created_at         DateTime?          @default(now()) @db.Timestamptz(6)
+  ppdb_registrations ppdb_registrations @relation(fields: [registration_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([registration_id], map: "idx_push_subscriptions_reg")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model school_settings {
+  id        String   @id @default("main")
+  name      String
+  address   String
+  phone     String
+  email     String
+  logoUrl   String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model site_banners {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String
+  description     String?
+  buttontext      String?
+  buttonlink      String?
+  backgroundcolor String?  @default("#10b981")
+  textcolor       String?  @default("#ffffff")
+  placement       String?  @default("home")
+  displayorder    Int?     @default(0)
+  isactive        Boolean? @default(true)
+  createdat       DateTime @default(now()) @db.Timestamptz(6)
+  updatedat       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([placement, isactive, displayorder], map: "site_banners_placement_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model site_settings {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  school_name         String
+  school_logo_url     String?
+  school_address      String?
+  school_phone        String?
+  school_email        String?
+  school_whatsapp     String?
+  school_tagline      String?
+  is_active           Boolean? @default(true)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+  favicon_url         String?
+  meta_description    String?
+  meta_keywords       String?
+  google_analytics_id String?
+  facebook_pixel_id   String?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model social_media_links {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  platform      String
+  url           String
+  display_order Int?     @default(0)
+  is_active     Boolean? @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model teachers {
+  id        BigInt   @id @default(autoincrement())
+  name      String
+  position  String
+  imageUrl  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([isActive], map: "teachers_active_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model vision_mission_page {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vision_text  String
+  mission_text String
+  is_active    Boolean? @default(true)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([is_active], map: "vision_mission_page_active_idx")
+}
+
+model library_levels {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  slug          String          @unique
+  description   String?
+  display_order Int?            @default(0)
+  is_active     Boolean?        @default(true)
+  created_at    DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?       @default(now()) @db.Timestamptz(6)
+  library_media library_media[]
+
+  @@index([is_active, display_order], map: "idx_library_levels_active_order")
+}
+
+model library_categories {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  slug          String          @unique
+  icon          String?
+  description   String?
+  display_order Int?            @default(0)
+  is_active     Boolean?        @default(true)
+  created_at    DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?       @default(now()) @db.Timestamptz(6)
+  library_media library_media[]
+
+  @@index([is_active, display_order], map: "idx_library_categories_active_order")
+}
+
+model library_media_types {
+  id            Int               @id @default(autoincrement())
+  name          String            @unique
+  slug          String            @unique
+  icon          String?
+  description   String?
+  file_kind     library_file_kind @default(OTHER)
+  display_order Int?              @default(0)
+  is_active     Boolean?          @default(true)
+  created_at    DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?         @default(now()) @db.Timestamptz(6)
+  library_media library_media[]
+
+  @@index([is_active, display_order], map: "idx_library_media_types_active_order")
+}
+
+model library_media {
+  id                  Int                @id @default(autoincrement())
+  title               String
+  description         String?
+  category_id         Int
+  media_type_id       Int
+  level_id            Int
+  visibility          library_visibility @default(PUBLIC)
+  is_featured         Boolean?           @default(false)
+  is_active           Boolean?           @default(true)
+  file_name           String?
+  file_mime_type      String?
+  file_extension      String?
+  file_size_bytes     BigInt?
+  storage_provider    String?            @default("r2")
+  storage_bucket      String?
+  storage_path        String?
+  file_url            String
+  thumbnail_provider  String?            @default("r2")
+  thumbnail_bucket    String?
+  thumbnail_path      String?
+  thumbnail_url       String?
+  source_url          String?
+  source_label        String?
+  tags                Json?              @default("[]")
+  metadata            Json?              @default("{}")
+  view_count          Int?               @default(0)
+  download_count      Int?               @default(0)
+  published_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  created_at          DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?          @default(now()) @db.Timestamptz(6)
+  library_categories  library_categories @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  library_media_types library_media_types @relation(fields: [media_type_id], references: [id], onUpdate: NoAction)
+  library_levels      library_levels     @relation(fields: [level_id], references: [id], onUpdate: NoAction)
+
+  @@index([visibility, is_active, published_at], map: "idx_library_media_visibility_active")
+  @@index([category_id], map: "idx_library_media_category")
+  @@index([media_type_id], map: "idx_library_media_type")
+  @@index([level_id], map: "idx_library_media_level")
+  @@index([storage_bucket, storage_path], map: "idx_library_media_storage")
+  @@index([is_featured], map: "idx_library_media_featured")
+}
+
+enum content_type {
+  news
+  announcement
+  article
+  gallery
+  download
+}
+
+enum file_type {
+  PDF
+  DOCX
+  XLSX
+}
+
+enum gender {
+  L
+  P
+}
+
+enum grade_letter {
+  A
+  B
+  C
+  D
+}
+
+enum graduation_status {
+  LULUS
+  DITUNDA
+}
+
+enum media_type {
+  image
+  file
+  embed
+}
+
+enum payment_status {
+  LUNAS
+  BELUM_LUNAS
+}
+
+enum ppdb_status {
+  VERIFIKASI
+  BERKAS_VALID
+  DITERIMA
+  DITOLAK
+}
+
+enum teacher_note_type {
+  POSITIF
+  NEGATIF
+  INFO
+}
+
+enum user_role {
+  ADMIN
+  WALI
+}
+
+enum library_visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum library_file_kind {
+  IMAGE
+  VIDEO
+  AUDIO
+  PDF
+  DOCUMENT
+  SPREADSHEET
+  PRESENTATION
+  ARCHIVE
+  OTHER
+}
