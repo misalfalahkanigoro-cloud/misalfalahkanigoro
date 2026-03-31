@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Image as ImageIcon, Film, Code, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { ContentMediaType } from '@/lib/types';
-import { CldUploadWidget } from '@/components/r2-upload-widget';
+import { StorageUploadWidget } from '@/components/r2-upload-widget';
 
 export type MediaForm = {
     id?: string | number;
@@ -160,7 +160,7 @@ const MediaManager: React.FC<MediaManagerProps> = ({ items, onChange, onMessage 
                                         placeholder="URL Media / File"
                                     />
                                     {canUpload ? (
-                                        <CldUploadWidget
+                                        <StorageUploadWidget
                                             options={{ folder: 'mis-al-falah/media' }}
                                             onSuccess={(res) => handleUploadResult(index, res)}
                                         >
@@ -177,7 +177,7 @@ const MediaManager: React.FC<MediaManagerProps> = ({ items, onChange, onMessage 
                                                     )}
                                                 </button>
                                             )}
-                                        </CldUploadWidget>
+                                        </StorageUploadWidget>
                                     ) : (
                                         <label className="flex cursor-pointer items-center justify-center rounded-xl border border-emerald-300 px-3 text-emerald-300">
                                             <input

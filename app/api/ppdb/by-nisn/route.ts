@@ -1,42 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
+import { mapPpdbFile } from '@/lib/ppdb-mapper';
+import { requireAdminRole } from '@/lib/admin-auth';
 
 export async function GET(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(request.url);
         const nisn = searchParams.get('nisn');
+
         if (!nisn) {
             return NextResponse.json({ error: 'NISN is required' }, { status: 400 });
         }
 
-        const { data: registration, error } = await dbAdmin()
-            .from('ppdb_registrations')
-            .select('*')
-            .eq('nisn', nisn)
-            .maybeSingle();
+        const registration = await prisma.ppdb_registrations.findFirst({
+            where: { nisn },
+        });
 
-        if (error) throw error;
         if (!registration) {
             return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
         }
 
-        const { data: files, error: filesError } = await dbAdmin()
-            .from('ppdb_files')
-            .select('*')
-            .eq('registration_id', registration.id)
-            .order('created_at', { ascending: true });
-
-        if (filesError) throw filesError;
+        const files = await prisma.ppdb_files.findMany({
+            where: { registration_id: registration.id },
+            orderBy: [{ created_at: 'asc' }],
+        });
 
         return NextResponse.json({
             ...registration,
-            files: (files || []).map((file: any) => ({
-                id: file.id,
-                registrationId: file.registration_id,
-                fileType: file.file_type,
-                fileUrl: file.file_url,
-                createdAt: file.created_at,
-            })),
+            files: files.map((file) => mapPpdbFile(file as unknown as Record<string, any>)),
         });
     } catch (error) {
         console.error('PPDB by NISN error:', error);

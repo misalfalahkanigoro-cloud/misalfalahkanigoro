@@ -1,16 +1,22 @@
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
 
 export async function GET() {
     try {
-        const { data, error } = await dbAdmin()
-            .from('push_subscriptions')
-            .select('id, registration_id, created_at, ppdb_registrations (id, namaLengkap, nisn)')
-            .order('created_at', { ascending: false });
+        const rows = await prisma.push_subscriptions.findMany({
+            orderBy: [{ created_at: 'desc' }],
+            include: {
+                ppdb_registrations: {
+                    select: {
+                        id: true,
+                        namaLengkap: true,
+                        nisn: true,
+                    },
+                },
+            },
+        });
 
-        if (error) throw error;
-
-        const mapped = (data || []).map((row: any) => ({
+        const mapped = rows.map((row) => ({
             id: row.id,
             registrationId: row.registration_id,
             createdAt: row.created_at,

@@ -1,34 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
+
+const mapBrochure = (row: Record<string, any>) => ({
+    id: row.id,
+    entityId: row.entity_id,
+    mediaUrl: row.media_url,
+    caption: row.caption,
+    displayOrder: row.display_order,
+    isMain: row.is_main,
+    createdAt: row.created_at,
+});
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
         const payload = await request.json();
-        const { data, error } = await dbAdmin()
-            .from('media_items')
-            .update({
+
+        const updated = await prisma.media_items.update({
+            where: { id },
+            data: {
                 entity_id: payload.waveId,
                 media_url: payload.mediaUrl,
                 caption: payload.caption || null,
                 is_main: Boolean(payload.isMain),
                 display_order: Number(payload.displayOrder) || 0,
-            })
-            .eq('id', id)
-            .select('*')
-            .single();
-
-        if (error) throw error;
-
-        return NextResponse.json({
-            id: data.id,
-            entityId: data.entity_id,
-            mediaUrl: data.media_url,
-            caption: data.caption,
-            displayOrder: data.display_order,
-            isMain: data.is_main,
-            createdAt: data.created_at,
+            },
         });
+
+        return NextResponse.json(mapBrochure(updated as unknown as Record<string, any>));
     } catch (error) {
         console.error('Admin PPDB brochure update error:', error);
         return NextResponse.json({ error: 'Failed to update brochure' }, { status: 500 });
@@ -38,12 +37,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
-        const { error } = await dbAdmin()
-            .from('media_items')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
+        await prisma.media_items.delete({ where: { id } });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Admin PPDB brochure delete error:', error);

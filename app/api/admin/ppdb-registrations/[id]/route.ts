@@ -1,55 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
 import { sendPushNotification } from '@/lib/push';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { createPpdbAccessToken } from '@/lib/ppdb-access';
+import { mapPpdbRegistration } from '@/lib/ppdb-mapper';
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    try {
+        const { id } = await params;
+        const registration = await prisma.ppdb_registrations.findUnique({
+            where: { id },
+        });
+
+        if (!registration) {
+            return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+        }
+
+        const files = await prisma.ppdb_files.findMany({
+            where: { registration_id: id },
+            orderBy: [{ created_at: 'asc' }],
+        });
+
+        return NextResponse.json(
+            mapPpdbRegistration(
+                registration as unknown as Record<string, any>,
+                files as unknown as Array<Record<string, any>>
+            )
+        );
+    } catch (error) {
+        console.error('Admin PPDB detail error:', error);
+        return NextResponse.json({ error: 'Failed to fetch PPDB registration' }, { status: 500 });
+    }
+}
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { id } = await params;
         const payload = await request.json();
-        const updatePayload = {
-            status: payload.status,
-            pesan: payload.pesan ?? null,
-        };
 
-        const { data: registration, error } = await dbAdmin()
-            .from('ppdb_registrations')
-            .update(updatePayload)
-            .eq('id', id)
-            .select('*')
-            .single();
-
-        if (error) {
-            throw error;
-        }
+        const registration = await prisma.ppdb_registrations.update({
+            where: { id },
+            data: {
+                status: payload.status,
+                pesan: payload.pesan ?? null,
+            },
+        });
 
         let hasSubscription = false;
+
         try {
-            const { data: subs, error: subsError } = await dbAdmin()
-                .from('push_subscriptions')
-                .select('endpoint, p256dh, auth')
-                .eq('registration_id', id);
+            const subscriptions = await prisma.push_subscriptions.findMany({
+                where: { registration_id: id },
+                select: {
+                    endpoint: true,
+                    p256dh: true,
+                    auth: true,
+                },
+            });
 
-            if (subsError) throw subsError;
-
-            hasSubscription = Boolean(subs && subs.length);
+            hasSubscription = subscriptions.length > 0;
 
             if (payload.sendNotification && hasSubscription) {
+                const accessToken = createPpdbAccessToken(id);
                 const pushPayload = {
                     title: 'Status PPDB Diperbarui',
-                    body: `Status pendaftaran Anda sekarang: ${updatePayload.status}`,
-                    data: { url: registration.nisn ? `/ppdb/sukses?nisn=${registration.nisn}` : '/ppdb' },
+                    body: `Status pendaftaran Anda sekarang: ${payload.status}`,
+                    data: { url: `/ppdb/sukses?token=${encodeURIComponent(accessToken)}` },
                 };
 
-                for (const sub of subs || []) {
+                for (const subscription of subscriptions) {
                     try {
-                        await sendPushNotification(sub as any, pushPayload);
-                    } catch (err) {
-                        console.error('Failed to send push notification:', err);
+                        await sendPushNotification(subscription as any, pushPayload);
+                    } catch (pushError) {
+                        console.error('Failed to send push notification:', pushError);
                     }
                 }
             }
-        } catch (err) {
-            console.error('Push notification error:', err);
+        } catch (error) {
+            console.error('Push notification error:', error);
         }
 
         return NextResponse.json({ ...registration, hasSubscription });
@@ -59,15 +97,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { id } = await params;
-        const { error } = await dbAdmin()
-            .from('ppdb_registrations')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
+        await prisma.ppdb_registrations.delete({ where: { id } });
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Admin PPDB delete error:', error);

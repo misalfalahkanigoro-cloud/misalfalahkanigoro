@@ -25,7 +25,7 @@ export interface NewsPost {
     content?: string | null;
     authorName: string;
     publishedAt: string;
-    isPublished: boolean;
+    is_published: boolean;
     isPinned: boolean;
     viewCount: number;
     createdAt: string;
@@ -46,7 +46,7 @@ export interface Publication {
     content?: string | null;
     authorName: string;
     publishedAt: string;
-    isPublished: boolean;
+    is_published: boolean;
     isPinned: boolean;
     createdAt: string;
     updatedAt: string;
@@ -64,7 +64,7 @@ export interface Achievement {
     rank: string | null;
     description: string | null;
     achievedAt: string;
-    isPublished: boolean;
+    is_published: boolean;
     isPinned: boolean;
     createdAt: string;
     updatedAt: string;
@@ -81,7 +81,7 @@ export interface Gallery {
     description: string | null;
     eventDate: string | null;
     publishedAt: string;
-    isPublished: boolean;
+    is_published: boolean;
     isPinned: boolean;
     createdAt: string;
     updatedAt: string;
@@ -94,6 +94,7 @@ export interface Download {
     title: string;
     slug: string;
     description: string | null;
+    category?: string | null; // Added for UI compatibility
     fileUrl?: string | null; // legacy single file
     fileStorageProvider?: string | null;
     fileStorageBucket?: string | null;
@@ -102,7 +103,7 @@ export interface Download {
     fileType?: string | null; // legacy single file
     files?: DownloadFile[]; // new multi-file attachments stored in object storage
     downloadCount: number;
-    isPublished: boolean;
+    is_published: boolean;
     isPinned?: boolean;
     createdAt: string;
     updatedAt: string;
@@ -124,6 +125,7 @@ export interface DownloadFile {
     createdAt?: string;
 }
 
+
 export type ContentPost = NewsPost | Publication | Achievement | Gallery;
 export type ContentType = 'news' | 'publication' | 'achievement' | 'gallery' | 'download';
 
@@ -138,6 +140,7 @@ export interface PinnedItem {
 
 export interface SiteSettings {
     id: string;
+    siteTitle: string | null;
     schoolName: string;
     schoolLogoUrl: string | null;
     schoolAddress: string | null;
@@ -149,7 +152,10 @@ export interface SiteSettings {
     metaDescription?: string | null;
     metaKeywords?: string | null;
     googleAnalyticsId?: string | null;
-    facebookPixelId?: string | null;
+    whatsappList?: any[] | null;
+    adminWhatsappId?: string | null;
+    mapEmbedHtml?: string | null;
+    socialMedia?: Record<string, string> | null;
     isActive: boolean;
 }
 
@@ -225,7 +231,8 @@ export interface Activity {
     id: string;
     title: string;
     imageUrl: string | null;
-    date: string;
+    isActive: boolean;
+    createdAt: string;
 }
 
 export interface Extracurricular {
@@ -235,8 +242,8 @@ export interface Extracurricular {
     icon: string | null;
     coachName?: string | null;
     schedule?: string | null;
-    displayOrder: number;
-    isActive: boolean;
+    displayorder: number;
+    isactive: boolean;
 }
 
 export interface CharacterProgram {
@@ -245,8 +252,8 @@ export interface CharacterProgram {
     description: string | null;
     icon: string | null;
     frequency?: string | null;
-    displayOrder: number;
-    isActive: boolean;
+    displayorder: number;
+    isactive: boolean;
 }
 
 export interface AcademicSubject {
@@ -283,7 +290,7 @@ export interface AcademicSection {
     pageId: string;
     title: string;
     body?: string | null;
-    displayOrder: number;
+    display_order: number;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -295,7 +302,7 @@ export interface GraduationStudent {
     name?: string; // for compatibility
     nisn?: string;
     className?: string;
-    status: 'LULUS' | 'TIDAK_LULUS' | 'PENDING';
+    status: 'LULUS' | 'TIDAK_LULUS' | 'PENDING' | 'DITUNDA';
     schoolName: string;
     averageScore?: number;
 }
@@ -308,11 +315,11 @@ export interface PageHero {
 }
 
 export interface PPDBStatusResponse {
-    id: string;
-    nama: string;
     tanggalDaftar: string;
     status: string;
     pesan: string | null;
+    canViewSubmission: boolean;
+    summaryMessage: string;
 }
 
 export interface PPDBFormData {
@@ -342,7 +349,21 @@ export interface PPDBSubmitResponse {
     registration?: PPDBRegistration;
     registrationId?: string;
     nisn?: string;
+    accessToken?: string;
     message: string;
+}
+
+export interface PPDBPublicSummary {
+    id: string;
+    namaLengkap: string;
+    nisn: string | null;
+    tempatLahir: string;
+    tanggalLahir: string;
+    jenisKelamin: 'L' | 'P';
+    status: string;
+    pesan?: string | null;
+    tanggalDaftar?: string;
+    files?: PPDBFile[];
 }
 
 export interface ContactWhatsappItem {
@@ -416,6 +437,7 @@ export interface PPDBListItem {
 
 export interface PushSubscriptionPayload {
     registrationId: string;
+    accessToken?: string;
     endpoint: string;
     p256dh: string;
     auth: string;
@@ -429,6 +451,12 @@ export interface PPDBWave {
     endDate: string;
     quota?: number | null;
     isActive: boolean;
+    documentRequirements?: Array<{
+        id: string;
+        label: string;
+        key: string;
+        isRequired: boolean;
+    }>;
     createdAt?: string;
     updatedAt?: string;
 }

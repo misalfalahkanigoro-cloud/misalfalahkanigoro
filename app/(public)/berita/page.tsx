@@ -6,6 +6,24 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import type { NewsPost } from '@/lib/types';
 
+type NewsListResponse = {
+    items: NewsPost[];
+    total: number;
+};
+
+const isNewsListResponse = (value: unknown): value is NewsListResponse => {
+    if (!value || typeof value !== 'object') return false;
+    const record = value as Record<string, unknown>;
+    return Array.isArray(record.items) && typeof record.total === 'number';
+};
+
+const formatPublishedDate = (value?: string | number | null) => {
+    if (value === undefined || value === null) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return parsed.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
 const Berita: React.FC = () => {
     const [news, setNews] = useState<NewsPost[]>([]);
     const [page, setPage] = useState(1);
@@ -19,22 +37,23 @@ const Berita: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                // Assuming API returns { items: NewsPost[], total: number } or just NewsPost[]
                 const res = await api.getNews({ page, pageSize });
 
-                // Handle various response types for robustness
                 if (Array.isArray(res)) {
                     setNews(res);
-                    setTotal(res.length); // Mock total if no pagination metadata
-                } else if ((res as any).items) {
-                    setNews((res as any).items);
-                    setTotal((res as any).total || 0);
+                    setTotal(res.length);
+                } else if (isNewsListResponse(res)) {
+                    setNews(res.items);
+                    setTotal(res.total);
                 } else {
                     setNews([]);
+                    setTotal(0);
                 }
             } catch (err) {
                 console.error('Error fetching news:', err);
                 setError('Gagal memuat berita');
+                setNews([]);
+                setTotal(0);
             } finally {
                 setLoading(false);
             }
@@ -45,7 +64,6 @@ const Berita: React.FC = () => {
 
     // Simple Pagination Logic
     const maxPage = Math.max(1, Math.ceil(total / pageSize));
-    const pageNumbers = Array.from({ length: maxPage }, (_, i) => i + 1);
 
     const handleShare = (title: string, slug: string) => {
         const url = typeof window !== 'undefined' ? `${window.location.origin}/berita/${slug}` : '';
@@ -111,7 +129,7 @@ const Berita: React.FC = () => {
                                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
                                             <span className="flex items-center gap-1">
                                                 <Calendar size={14} />
-                                                {new Date(item.publishedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                                {formatPublishedDate(item.publishedAt)}
                                             </span>
                                             <span className="flex items-center gap-1">
                                                 <User size={14} />
@@ -122,7 +140,7 @@ const Berita: React.FC = () => {
                                             <Link href={`/berita/${item.slug}`}>{item.title}</Link>
                                         </h3>
                                         <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-3">
-                                            {item.excerpt || (item.content ? item.content.substring(0, 100) + '...' : '')}
+                                            {item.excerpt || (item.content ? item.content.replace(/<[^>]*>/g, '').substring(0, 150) + '...' : 'Baca selengkapnya...')}
                                         </p>
 
                                         <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">

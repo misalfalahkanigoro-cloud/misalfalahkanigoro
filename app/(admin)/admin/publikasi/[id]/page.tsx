@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Trash2, FileText, Megaphone, Newspaper, Paperclip, ImagePlus } from 'lucide-react';
 import SidebarAdmin from '@/components/sidebar-admin';
 import TiptapEditor from '@/components/tiptap-editor';
-import { api } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 import type { Publication, PublicationType, MediaItem } from '@/lib/types';
 import MediaUploadButton from '@/components/admin/MediaUploadButton';
 
@@ -23,7 +23,7 @@ const AdminPublicationEditPage: React.FC = () => {
         content: '',
         coverUrl: '',
         publishedAt: new Date().toISOString().split('T')[0],
-        isPublished: true,
+        is_published: true,
         isPinned: false,
         media: [],
     });
@@ -35,7 +35,7 @@ const AdminPublicationEditPage: React.FC = () => {
         if (!isNew && id) {
             const fetchData = async () => {
                 try {
-                    const res = await api.getPublicationDetail(id);
+                    const res = await adminApi.getPublicationDetail(id);
                     if (res) {
                         const coverFromMedia = (res as Publication).media?.find((item) => item.isMain)?.mediaUrl || '';
                         setForm({
@@ -77,7 +77,7 @@ const AdminPublicationEditPage: React.FC = () => {
                 publishedAt: form.publishedAt
                     ? new Date(form.publishedAt).toISOString()
                     : new Date().toISOString(),
-                isPublished: form.isPublished ?? true,
+                is_published: form.is_published ?? true,
                 isPinned: form.isPinned ?? false,
                 coverUrl: form.coverUrl?.trim() || null,
                 media: (form.media || [])
@@ -89,9 +89,9 @@ const AdminPublicationEditPage: React.FC = () => {
             };
 
             if (isNew) {
-                await api.createPublication(payload as any);
+                await adminApi.createPublication(payload as any);
             } else {
-                await api.updatePublication(id, payload as any);
+                await adminApi.updatePublication(id, payload as any);
             }
             router.push('/admin/publikasi');
             router.refresh();
@@ -165,7 +165,7 @@ const AdminPublicationEditPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80 space-y-8">
+            <main className="min-h-screen px-6 py-10 lg:pl-64 space-y-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-4">
@@ -329,8 +329,8 @@ const AdminPublicationEditPage: React.FC = () => {
                                 <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition mb-2">
                                     <input
                                         type="checkbox"
-                                        checked={form.isPublished}
-                                        onChange={e => setForm({ ...form, isPublished: e.target.checked })}
+                                        checked={form.is_published}
+                                        onChange={e => setForm({ ...form, is_published: e.target.checked })}
                                         className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
                                     />
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Publikasikan</span>

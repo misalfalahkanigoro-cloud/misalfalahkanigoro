@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
 
 export async function GET() {
     try {
-        const { data: page, error } = await dbAdmin()
-            .from('profile_page')
-            .select('*')
-            .eq('id', 'main')
-            .maybeSingle();
-
-        if (error) {
-            throw error;
-        }
+        const page = await prisma.profile_page.findUnique({
+            where: { id: 'main' },
+        });
 
         if (!page) {
             return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
@@ -20,10 +14,7 @@ export async function GET() {
         return NextResponse.json(page);
     } catch (error: any) {
         console.error('Admin profile page error:', error);
-        return NextResponse.json(
-            { error: error?.message || error?.details || 'Failed to fetch profile page' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: error?.message || 'Failed to fetch profile page' }, { status: 500 });
     }
 }
 
@@ -32,38 +23,46 @@ export async function PUT(request: Request) {
         const payload = await request.json();
         const pageId = 'main';
 
-        const pagePayload = {
-            id: pageId,
-            descriptionJson: payload.descriptionJson ?? payload.description_json ?? null,
-            descriptionHtml: payload.descriptionHtml ?? payload.description_html ?? null,
-            descriptionText: payload.descriptionText ?? payload.description_text ?? null,
-            videoUrl: payload.videoUrl ?? payload.video_url ?? null,
-            schoolName: payload.schoolName ?? '',
-            npsn: payload.npsn ?? '',
-            schoolAddress: payload.schoolAddress ?? '',
-            village: payload.village ?? '',
-            district: payload.district ?? '',
-            city: payload.city ?? '',
-            province: payload.province ?? '',
-            schoolStatus: payload.schoolStatus ?? '',
-            educationForm: payload.educationForm ?? '',
-            educationLevel: payload.educationLevel ?? '',
-        };
-
-        const { error: pageError } = await dbAdmin()
-            .from('profile_page')
-            .upsert(pagePayload, { onConflict: 'id' });
-
-        if (pageError) {
-            throw pageError;
-        }
+        await prisma.profile_page.upsert({
+            where: { id: pageId },
+            create: {
+                id: pageId,
+                descriptionJson: payload.descriptionJson ?? payload.description_json ?? null,
+                descriptionHtml: payload.descriptionHtml ?? payload.description_html ?? null,
+                descriptionText: payload.descriptionText ?? payload.description_text ?? null,
+                videoUrl: payload.videoUrl ?? payload.video_url ?? null,
+                schoolName: payload.schoolName ?? '',
+                npsn: payload.npsn ?? '',
+                schoolAddress: payload.schoolAddress ?? '',
+                village: payload.village ?? '',
+                district: payload.district ?? '',
+                city: payload.city ?? '',
+                province: payload.province ?? '',
+                schoolStatus: payload.schoolStatus ?? '',
+                educationForm: payload.educationForm ?? '',
+                educationLevel: payload.educationLevel ?? '',
+            },
+            update: {
+                descriptionJson: payload.descriptionJson ?? payload.description_json ?? null,
+                descriptionHtml: payload.descriptionHtml ?? payload.description_html ?? null,
+                descriptionText: payload.descriptionText ?? payload.description_text ?? null,
+                videoUrl: payload.videoUrl ?? payload.video_url ?? null,
+                schoolName: payload.schoolName ?? '',
+                npsn: payload.npsn ?? '',
+                schoolAddress: payload.schoolAddress ?? '',
+                village: payload.village ?? '',
+                district: payload.district ?? '',
+                city: payload.city ?? '',
+                province: payload.province ?? '',
+                schoolStatus: payload.schoolStatus ?? '',
+                educationForm: payload.educationForm ?? '',
+                educationLevel: payload.educationLevel ?? '',
+            },
+        });
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error('Admin profile page update error:', error);
-        return NextResponse.json(
-            { error: error?.message || error?.details || 'Failed to update profile page' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: error?.message || 'Failed to update profile page' }, { status: 500 });
     }
 }

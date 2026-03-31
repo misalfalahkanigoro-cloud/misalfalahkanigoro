@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { sanitizePlainText, sanitizeRichText } from '@/lib/rich-text';
+import { logError } from '@/lib/logger';
 
 type AnyRecord = Record<string, any>;
 
@@ -44,6 +47,7 @@ const mapNewsItem = (row: AnyRecord, media: AnyRecord[] = []) => {
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
+        const isAdminRequest = Boolean(requireAdminRole(request.cookies, ['admin', 'superadmin']));
         const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
         const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') || '10', 10)));
         const slug = (searchParams.get('slug') || '').trim();
@@ -52,7 +56,7 @@ export async function GET(request: NextRequest) {
 
         const where: AnyRecord = {};
         if (slug) where.slug = slug;
-        if (publishedOnly) where.is_published = true;
+        if (!isAdminRequest || publishedOnly) where.is_published = true;
 
         const [rows, total] = await Promise.all([
             prisma.news_posts.findMany({
@@ -90,67 +94,8 @@ export async function GET(request: NextRequest) {
             pageSize,
         });
     } catch (error) {
-        console.error('API Error:', error);
+        logError('news.GET', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const created = await prisma.news_posts.create({
-            data: {
-                title: body.title,
-                slug: body.slug,
-                excerpt: body.excerpt ?? null,
-                content: body.content ?? null,
-                author_name: body.authorName ?? 'Admin',
-                published_at: body.publishedAt ? new Date(body.publishedAt) : undefined,
-                is_published: typeof body.isPublished === 'boolean' ? body.isPublished : undefined,
-                is_pinned: typeof body.isPinned === 'boolean' ? body.isPinned : undefined,
-            },
-        });
-
-        const mediaRows: Prisma.media_itemsCreateManyInput[] = [];
-
-        if (body.coverUrl) {
-            mediaRows.push({
-                entity_id: created.id,
-                entity_type: 'news',
-                media_type: 'image',
-                media_url: body.coverUrl,
-                is_main: true,
-                display_order: 0,
-            });
-        }
-
-        if (Array.isArray(body.media)) {
-            const normalized = body.media
-                .filter((item: AnyRecord) => item?.mediaUrl)
-                .map((item: AnyRecord, index: number) => ({
-                    entity_id: created.id,
-                    entity_type: 'news',
-                    media_type: item.mediaType || 'image',
-                    storage_provider: item.storageProvider ?? null,
-                    storage_bucket: item.storageBucket ?? null,
-                    storage_path: item.storagePath ?? null,
-                    media_url: item.mediaUrl,
-                    thumbnail_url: item.thumbnailUrl ?? null,
-                    caption: item.caption ?? null,
-                    is_main: Boolean(item.isMain),
-                    display_order: item.displayOrder ?? index + 1,
-                }));
-            mediaRows.push(...normalized);
-        }
-
-        if (mediaRows.length > 0) {
-            await prisma.media_items.createMany({ data: mediaRows });
-        }
-
-        return NextResponse.json(created);
-
-    } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-}

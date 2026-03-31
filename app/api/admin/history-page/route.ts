@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { sanitizePlainText, sanitizeRichText, sanitizeUrl } from '@/lib/rich-text';
 
 type HistoryPayload = {
     id?: string;
@@ -50,29 +52,29 @@ const mapTimeline = (items: any[]) =>
         isActive: item.is_active,
     }));
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
-        const { data: page, error } = await dbAdmin()
-            .from('history_page')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        const page = await prisma.history_page.findFirst({
+            orderBy: { created_at: 'desc' },
+            include: {
+                history_timeline_items: {
+                    orderBy: [{ display_order: 'asc' }, { created_at: 'asc' }],
+                },
+            },
+        });
 
-        if (error) throw error;
-        if (!page) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
-
-        const { data: timeline, error: timelineError } = await dbAdmin()
-            .from('history_timeline_items')
-            .select('*')
-            .eq('history_page_id', page.id)
-            .order('display_order', { ascending: true });
-
-        if (timelineError) throw timelineError;
+        if (!page) {
+            return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+        }
 
         return NextResponse.json({
             page: mapPage(page),
-            timelineItems: mapTimeline(timeline || []),
+            timelineItems: mapTimeline(page.history_timeline_items),
         });
     } catch (error: any) {
         console.error('Admin history page error:', error);
@@ -83,80 +85,83 @@ export async function GET() {
     }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const payload = (await request.json()) as HistoryPayload;
 
-        const { data: existing, error: existingError } = await dbAdmin()
-            .from('history_page')
-            .select('id')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        const saved = await prisma.$transaction(async (tx) => {
+            const existing = payload.id
+                ? await tx.history_page.findUnique({ where: { id: payload.id } })
+                : await tx.history_page.findFirst({ orderBy: { created_at: 'desc' }, select: { id: true } });
 
-        if (existingError) throw existingError;
+            const pagePayload: any = {
+                title: sanitizePlainText(payload.title, 160) ?? 'Sejarah Madrasah',
+                subtitle: sanitizePlainText(payload.subtitle, 220),
+                content_json: payload.contentJson ?? null,
+                content_html: sanitizeRichText(payload.contentHtml),
+                content_text: sanitizePlainText(payload.contentText, 10_000),
+                cover_image_url: sanitizeUrl(payload.coverImageUrl),
+                video_url: sanitizeUrl(payload.videoUrl),
+                is_active: payload.isActive ?? true,
+            };
 
-        const pagePayload = {
-            title: payload.title ?? 'Sejarah Madrasah',
-            subtitle: payload.subtitle ?? null,
-            content_json: payload.contentJson ?? null,
-            content_html: payload.contentHtml ?? null,
-            content_text: payload.contentText ?? null,
-            cover_image_url: payload.coverImageUrl ?? null,
-            video_url: payload.videoUrl ?? null,
-            is_active: payload.isActive ?? true,
-        };
+            const page = existing?.id
+                ? await tx.history_page.update({
+                      where: { id: existing.id },
+                      data: pagePayload,
+                  })
+                : await tx.history_page.create({
+                      data: pagePayload,
+                  });
 
-        let pageId = existing?.id as string | undefined;
+            const incomingItems = Array.isArray(payload.timelineItems) ? payload.timelineItems : [];
+            const keptIds: string[] = [];
 
-        if (payload.id || pageId) {
-            const id = payload.id ?? pageId!;
-            const { error } = await dbAdmin()
-                .from('history_page')
-                .update(pagePayload)
-                .eq('id', id);
+            for (let index = 0; index < incomingItems.length; index += 1) {
+                const item = incomingItems[index];
+                const itemPayload: any = {
+                    history_page_id: page.id,
+                    year: sanitizePlainText(item.year, 20) ?? '',
+                    title: sanitizePlainText(item.title, 160) ?? '',
+                    description_json: item.descriptionJson ?? null,
+                    description_html: sanitizeRichText(item.descriptionHtml),
+                    description_text: sanitizePlainText(item.descriptionText, 5000),
+                    media_url: sanitizeUrl(item.mediaUrl),
+                    display_order: Number(item.displayOrder ?? index + 1) || index + 1,
+                    is_active: item.isActive ?? true,
+                };
 
-            if (error) throw error;
-            pageId = id;
-        } else {
-            const { data: inserted, error } = await dbAdmin()
-                .from('history_page')
-                .insert(pagePayload)
-                .select('id')
-                .single();
-            if (error) throw error;
-            pageId = inserted.id;
-        }
+                if (item.id) {
+                    const savedItem = await tx.history_timeline_items.upsert({
+                        where: { id: item.id },
+                        update: itemPayload,
+                        create: { id: item.id, ...itemPayload },
+                    });
+                    keptIds.push(savedItem.id);
+                } else {
+                    const savedItem = await tx.history_timeline_items.create({
+                        data: itemPayload,
+                    });
+                    keptIds.push(savedItem.id);
+                }
+            }
 
-        const items = Array.isArray(payload.timelineItems) ? payload.timelineItems : [];
+            await tx.history_timeline_items.deleteMany({
+                where: {
+                    history_page_id: page.id,
+                    ...(keptIds.length ? { id: { notIn: keptIds } } : {}),
+                },
+            });
 
-        const { error: deleteError } = await dbAdmin()
-            .from('history_timeline_items')
-            .delete()
-            .eq('history_page_id', pageId);
-        if (deleteError) throw deleteError;
+            return page;
+        });
 
-        if (items.length) {
-            const mapped = items.map((item, index) => ({
-                history_page_id: pageId,
-                year: item.year || '',
-                title: item.title || '',
-                description_json: item.descriptionJson ?? null,
-                description_html: item.descriptionHtml ?? null,
-                description_text: item.descriptionText ?? null,
-                media_url: item.mediaUrl ?? null,
-                display_order: item.displayOrder ?? index + 1,
-                is_active: item.isActive ?? true,
-            }));
-
-            const { error } = await dbAdmin()
-                .from('history_timeline_items')
-                .insert(mapped);
-
-            if (error) throw error;
-        }
-
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, id: saved.id });
     } catch (error: any) {
         console.error('Admin history page update error:', error);
         return NextResponse.json(

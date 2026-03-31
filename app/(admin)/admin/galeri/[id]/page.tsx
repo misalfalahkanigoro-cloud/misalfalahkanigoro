@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Trash2, Image as ImageIcon, Plus, X } from 'lucide-react';
 import SidebarAdmin from '@/components/sidebar-admin';
-import { api } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 import type { Gallery, MediaItem } from '@/lib/types';
 import MediaUploadButton from '@/components/admin/MediaUploadButton';
 
@@ -19,7 +19,7 @@ const AdminGalleryEditPage: React.FC = () => {
         slug: '',
         description: '',
         publishedAt: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-        isPublished: true,
+        is_published: true,
         media: [],
     });
 
@@ -31,7 +31,7 @@ const AdminGalleryEditPage: React.FC = () => {
         if (!isNew && id) {
             const fetchData = async () => {
                 try {
-                    const res = await api.getGalleryDetail(id); // Using slug/id fetcher
+                    const res = await adminApi.getGalleryDetail(id);
                     // Note: API might return by slug, but here we assume generic fetch by ID works or we need specific endpoint
                     // Ideally we should use getGalleryById if available, but for now assuming getGalleryDetail can handle ID or we fetch list and find (less efficient)
                     // Let's assume getGalleryDetail works with ID for admin purposes or we fix API later. 
@@ -66,9 +66,9 @@ const AdminGalleryEditPage: React.FC = () => {
             };
 
             if (isNew) {
-                await api.createGallery(payload as any);
+                await adminApi.createGallery(payload as any);
             } else {
-                await api.updateGallery(id, payload as any);
+                await adminApi.updateGallery(id, payload as any);
             }
             router.push('/admin/galeri');
             router.refresh();
@@ -133,7 +133,7 @@ const AdminGalleryEditPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80 space-y-8">
+            <main className="min-h-screen px-6 py-10 lg:pl-64 space-y-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-4">
@@ -258,8 +258,8 @@ const AdminGalleryEditPage: React.FC = () => {
                                 <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition">
                                     <input
                                         type="checkbox"
-                                        checked={form.isPublished}
-                                        onChange={e => setForm({ ...form, isPublished: e.target.checked })}
+                                        checked={form.is_published}
+                                        onChange={e => setForm({ ...form, is_published: e.target.checked })}
                                         className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
                                     />
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Publikasikan</span>

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/db';
+import { requireAdminRole } from '@/lib/admin-auth';
 
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
+        const isAdminRequest = Boolean(requireAdminRole(request.cookies, ['admin', 'superadmin']));
         const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
         const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') || '10', 10)));
         const level = searchParams.get('level');
@@ -20,6 +22,9 @@ export async function GET(request: NextRequest) {
 
         if (level) {
             query = query.eq('event_level', level);
+        }
+        if (!isAdminRequest) {
+            query = query.eq('is_published', true);
         }
 
         const { data, count, error } = await query;
@@ -84,77 +89,6 @@ export async function GET(request: NextRequest) {
             page,
             pageSize
         });
-
-    } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-}
-
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-
-        const dbPayload = {
-            title: body.title,
-            slug: body.slug,
-            event_name: body.eventName,
-            event_level: body.eventLevel,
-            rank: body.rank,
-            description: body.description,
-            achieved_at: body.achievedAt,
-            is_published: body.isPublished,
-            is_pinned: body.isPinned
-        };
-
-        const { data, error } = await dbAdmin()
-            .from('achievements')
-            .insert(dbPayload)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        if (body.coverUrl && data?.id) {
-            await dbAdmin()
-                .from('media_items')
-                .delete()
-                .eq('entity_id', data.id)
-                .eq('entity_type', 'achievement')
-                .eq('is_main', true);
-
-            await dbAdmin()
-                .from('media_items')
-                .insert({
-                    entity_id: data.id,
-                    entity_type: 'achievement',
-                    media_type: 'image',
-                    media_url: body.coverUrl,
-                    is_main: true,
-                    display_order: 0
-                });
-        }
-
-        if (body.media && Array.isArray(body.media) && body.media.length > 0) {
-            const normalized = body.media
-                .filter((m: any) => m.mediaUrl)
-                .map((m: any, idx: number) => ({
-                    entity_id: data.id,
-                    entity_type: 'achievement',
-                    media_type: m.mediaType || 'image',
-                    media_url: m.mediaUrl,
-                    thumbnail_url: m.thumbnailUrl || null,
-                    caption: m.caption || null,
-                    is_main: Boolean(m.isMain),
-                    display_order: m.displayOrder ?? idx + 1,
-                }));
-
-            if (normalized.length) {
-                await dbAdmin().from('media_items').insert(normalized);
-            }
-        }
-
-        return NextResponse.json(data);
 
     } catch (error) {
         console.error('API Error:', error);

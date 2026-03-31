@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
 
 export async function GET() {
     try {
-        const { data: page, error } = await dbAdmin()
-            .from('profile_page')
-            .select('*')
-            .eq('id', 'main')
-            .maybeSingle();
-
-        if (error) {
-            throw error;
-        }
+        const page = await prisma.profile_page.findUnique({
+            where: { id: 'main' },
+        });
 
         if (!page) {
             return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });

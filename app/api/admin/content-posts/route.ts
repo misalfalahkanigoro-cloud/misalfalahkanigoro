@@ -1,230 +1,216 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
-
-// Helper to determine the table name based on type
-const getTableName = (type: string) => {
-    switch (type) {
-        case 'news':
-            return 'news_posts';
-        case 'publication':
-        case 'announcement':
-        case 'article':
-        case 'bulletin':
-            return 'publications';
-        case 'achievement':
-            return 'achievements';
-        case 'gallery':
-            return 'galleries';
-        case 'download':
-            return 'downloads';
-        default:
-            return 'publications'; // Default
-    }
-};
-
-const parseMeta = (value: unknown) => {
-    if (value === null || value === undefined || value === '') {
-        return null;
-    }
-    if (typeof value === 'object') {
-        return value;
-    }
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (!trimmed) return null;
-        try {
-            return JSON.parse(trimmed);
-        } catch (e) {
-            return null;
-        }
-    }
-    return null;
-};
+import prisma from '@/lib/prisma';
+import { buildMediaPayload, groupMediaByEntity } from '@/lib/content-media';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { sanitizePlainText, sanitizeRichText } from '@/lib/rich-text';
+import { logError } from '@/lib/logger';
 
 type EntityType = 'news' | 'publication' | 'achievement' | 'gallery' | 'download';
-type MediaType = 'image' | 'video' | 'youtube_embed';
+type ModelName = 'news_posts' | 'publications' | 'achievements' | 'galleries' | 'downloads';
 
-const normalizeMediaType = (value: unknown): MediaType => {
-    const mediaType = String(value || '')
-        .toLowerCase()
-        .trim();
-
-    if (mediaType === 'video') return 'video';
-    if (mediaType === 'youtube_embed') return 'youtube_embed';
-    return 'image';
+type TypeConfig = {
+    model: ModelName;
+    entityType: EntityType;
+    publicationSubtype?: 'announcement' | 'article' | 'bulletin';
 };
 
-const buildMediaPayload = (
-    entityId: string,
-    entityType: EntityType,
-    mediaInput: unknown,
-    coverUrlInput?: unknown
-) => {
-    const normalized: Array<{
-        entity_id: string;
-        entity_type: EntityType;
-        media_type: MediaType;
-        media_url: string;
-        thumbnail_url: string | null;
-        caption: string | null;
-        display_order: number;
-        is_main: boolean;
-    }> = [];
+const toDateOrUndefined = (value: unknown) => {
+    if (!value) return undefined;
+    const parsed = new Date(String(value));
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
 
-    const seenUrls = new Set<string>();
-    const coverUrl = typeof coverUrlInput === 'string' ? coverUrlInput.trim() : '';
-    if (coverUrl) {
-        normalized.push({
-            entity_id: entityId,
-            entity_type: entityType,
-            media_type: 'image',
-            media_url: coverUrl,
-            thumbnail_url: null,
-            caption: null,
-            display_order: 0,
-            is_main: true,
-        });
-        seenUrls.add(coverUrl);
+const normalizePublicationSubtype = (value: unknown): 'announcement' | 'article' | 'bulletin' => {
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'publication') return 'announcement';
+    if (normalized === 'announcement' || normalized === 'article' || normalized === 'bulletin') return normalized;
+    return 'announcement';
+};
+
+const resolveTypeConfig = (type: string): TypeConfig => {
+    const normalized = String(type || '')
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'news') {
+        return { model: 'news_posts', entityType: 'news' };
     }
 
-    if (Array.isArray(mediaInput)) {
-        for (const item of mediaInput) {
-            if (!item || typeof item !== 'object') continue;
-            const mediaItem = item as Record<string, any>;
-            const mediaUrl = String(mediaItem.url || mediaItem.mediaUrl || mediaItem.embedHtml || '').trim();
-            if (!mediaUrl || seenUrls.has(mediaUrl)) continue;
-
-            normalized.push({
-                entity_id: entityId,
-                entity_type: entityType,
-                media_type: normalizeMediaType(mediaItem.mediaType),
-                media_url: mediaUrl,
-                thumbnail_url: mediaItem.thumbnailUrl || null,
-                caption: mediaItem.caption || null,
-                display_order: normalized.length,
-                is_main: !coverUrl && Boolean(mediaItem.isMain),
-            });
-
-            seenUrls.add(mediaUrl);
-        }
+    if (normalized === 'achievement') {
+        return { model: 'achievements', entityType: 'achievement' };
     }
 
-    if (normalized.length > 0 && !normalized.some((item) => item.is_main)) {
-        normalized[0].is_main = true;
+    if (normalized === 'gallery') {
+        return { model: 'galleries', entityType: 'gallery' };
     }
 
-    return normalized.map((item, index) => ({
-        ...item,
-        display_order: item.is_main ? 0 : Math.max(1, index),
-    }));
+    if (normalized === 'download') {
+        return { model: 'downloads', entityType: 'download' };
+    }
+
+    if (normalized === 'announcement' || normalized === 'article' || normalized === 'bulletin') {
+        return {
+            model: 'publications',
+            entityType: 'publication',
+            publicationSubtype: normalized,
+        };
+    }
+
+    return {
+        model: 'publications',
+        entityType: 'publication',
+        publicationSubtype: normalizePublicationSubtype(type),
+    };
+};
+
+const prismaAny = prisma as any;
+
+const getEntityTypeFromModel = (model: ModelName): EntityType => {
+    if (model === 'news_posts') return 'news';
+    if (model === 'publications') return 'publication';
+    if (model === 'achievements') return 'achievement';
+    if (model === 'galleries') return 'gallery';
+    return 'download';
 };
 
 export async function GET(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(request.url);
         const type = searchParams.get('type') || undefined;
+        const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+        const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '20', 10)));
+        const searchQuery = searchParams.get('search') || undefined;
+        const skip = (page - 1) * pageSize;
 
         if (type && type !== 'all') {
-            const tableName = getTableName(type);
-            let query = dbAdmin()
-                .from(tableName)
-                .select('*');
+            const config = resolveTypeConfig(type);
+            const where: Record<string, any> = {};
 
-            // Handle type filtering for publications if generic type requested
-            if (tableName === 'publications' && type !== 'publication') {
-                query = query.eq('type', type);
+            if (config.model === 'publications' && config.publicationSubtype) {
+                where.type = config.publicationSubtype;
             }
 
-            const { data, error } = await query.order('created_at', { ascending: false });
-            if (error) throw error;
-
-            const entityType = tableName === 'news_posts' ? 'news' :
-                tableName === 'publications' ? 'publication' :
-                    tableName === 'achievements' ? 'achievement' :
-                        tableName === 'galleries' ? 'gallery' : 'download';
-
-            const ids = (data || []).map((row: any) => row.id);
-            let mediaByEntity: Record<string, any[]> = {};
-            if (ids.length) {
-                const { data: mediaData, error: mediaError } = await dbAdmin()
-                    .from('media_items')
-                    .select('*')
-                    .eq('entity_type', entityType)
-                    .in('entity_id', ids)
-                    .order('display_order', { ascending: true });
-                if (mediaError) throw mediaError;
-                mediaByEntity = (mediaData || []).reduce((acc: any, m: any) => {
-                    (acc[m.entity_id] = acc[m.entity_id] || []).push(m);
-                    return acc;
-                }, {});
+            if (searchQuery) {
+                where.OR = [
+                    { title: { contains: searchQuery, mode: 'insensitive' } },
+                    { slug: { contains: searchQuery, mode: 'insensitive' } },
+                ];
             }
 
-            const mapped = (data || []).map((row: any) => ({
+            const [rows, total] = await Promise.all([
+                prismaAny[config.model].findMany({
+                    where,
+                    orderBy: [{ is_pinned: 'desc' }, { created_at: 'desc' }],
+                    skip,
+                    take: pageSize,
+                }),
+                prismaAny[config.model].count({ where }),
+            ]);
+
+            const ids = rows.map((row: Record<string, any>) => row.id);
+            const mediaRows = ids.length
+                ? await prisma.media_items.findMany({
+                      where: {
+                          entity_type: config.entityType,
+                          entity_id: { in: ids },
+                      },
+                      orderBy: [{ display_order: 'asc' }],
+                  })
+                : [];
+
+            const mediaByEntity = groupMediaByEntity(mediaRows as unknown as Array<Record<string, any>>);
+            const mapped = rows.map((row: Record<string, any>) => ({
                 ...row,
+                contentType: config.entityType,
                 media_items: mediaByEntity[row.id] || [],
             }));
 
-            return NextResponse.json(mapped);
+            return NextResponse.json({
+                items: mapped,
+                total,
+                page,
+                pageSize,
+            });
         }
 
-        // Fetch all if type=all or not provided
-        const [newsRes, pubRes, achRes, galRes] = await Promise.all([
-            dbAdmin().from('news_posts').select('*'),
-            dbAdmin().from('publications').select('*'),
-            dbAdmin().from('achievements').select('*'),
-            dbAdmin().from('galleries').select('*')
+        const [news, publications, achievements, galleries, downloads] = await Promise.all([
+            prisma.news_posts.findMany(),
+            prisma.publications.findMany(),
+            prisma.achievements.findMany(),
+            prisma.galleries.findMany(),
+            prisma.downloads.findMany(),
         ]);
 
-        const allIds = [
-            ...(newsRes.data || []).map((row: any) => ({ id: row.id, type: 'news' })),
-            ...(pubRes.data || []).map((row: any) => ({ id: row.id, type: 'publication' })),
-            ...(achRes.data || []).map((row: any) => ({ id: row.id, type: 'achievement' })),
-            ...(galRes.data || []).map((row: any) => ({ id: row.id, type: 'gallery' })),
+        const groupedEntities: Array<{ id: string; entityType: EntityType }> = [
+            ...news.map((row) => ({ id: row.id, entityType: 'news' as const })),
+            ...publications.map((row) => ({ id: row.id, entityType: 'publication' as const })),
+            ...achievements.map((row) => ({ id: row.id, entityType: 'achievement' as const })),
+            ...galleries.map((row) => ({ id: row.id, entityType: 'gallery' as const })),
+            ...downloads.map((row) => ({ id: row.id, entityType: 'download' as const })),
         ];
 
-        const mediaByEntityType: Record<string, Record<string, any[]>> = {
+        const groupedIds = groupedEntities.reduce<Record<string, string[]>>((acc, item) => {
+            if (!acc[item.entityType]) acc[item.entityType] = [];
+            acc[item.entityType].push(item.id);
+            return acc;
+        }, {});
+
+        const mediaByEntityType: Record<string, Record<string, Record<string, any>[]>> = {
             news: {},
             publication: {},
             achievement: {},
             gallery: {},
+            download: {},
         };
-
-        const groupedIds: Record<string, string[]> = allIds.reduce((acc: Record<string, string[]>, item) => {
-            (acc[item.type] = acc[item.type] || []).push(item.id);
-            return acc;
-        }, {});
 
         for (const [entityType, ids] of Object.entries(groupedIds)) {
             if (!ids.length) continue;
-            const { data: mediaData, error: mediaError } = await dbAdmin()
-                .from('media_items')
-                .select('*')
-                .eq('entity_type', entityType)
-                .in('entity_id', ids)
-                .order('display_order', { ascending: true });
-            if (mediaError) throw mediaError;
-            mediaByEntityType[entityType] = (mediaData || []).reduce((acc: any, m: any) => {
-                (acc[m.entity_id] = acc[m.entity_id] || []).push(m);
-                return acc;
-            }, {});
+            const mediaRows = await prisma.media_items.findMany({
+                where: {
+                    entity_type: entityType,
+                    entity_id: { in: ids },
+                },
+                orderBy: [{ display_order: 'asc' }],
+            });
+
+            mediaByEntityType[entityType] = groupMediaByEntity(mediaRows as unknown as Array<Record<string, any>>);
         }
 
         const all = [
-            ...(newsRes.data || []).map((x: any) => ({ ...x, type: 'news', media_items: mediaByEntityType.news[x.id] || [] })),
-            ...(pubRes.data || []).map((x: any) => ({ ...x, media_items: mediaByEntityType.publication[x.id] || [] })),
-            ...(achRes.data || []).map((x: any) => ({ ...x, type: 'achievement', media_items: mediaByEntityType.achievement[x.id] || [] })),
-            ...(galRes.data || []).map((x: any) => ({ ...x, type: 'gallery', media_items: mediaByEntityType.gallery[x.id] || [] }))
+            ...news.map((row) => ({ ...row, type: 'news', media_items: mediaByEntityType.news[row.id] || [] })),
+            ...publications.map((row) => ({ ...row, media_items: mediaByEntityType.publication[row.id] || [] })),
+            ...achievements.map((row) => ({ ...row, type: 'achievement', media_items: mediaByEntityType.achievement[row.id] || [] })),
+            ...galleries.map((row) => ({ ...row, type: 'gallery', media_items: mediaByEntityType.gallery[row.id] || [] })),
+            ...downloads.map((row) => ({ ...row, type: 'download', media_items: mediaByEntityType.download[row.id] || [] })),
         ];
 
-        return NextResponse.json(all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+        all.sort((a, b) => {
+            const left = a.created_at ? new Date(a.created_at as any).getTime() : 0;
+            const right = b.created_at ? new Date(b.created_at as any).getTime() : 0;
+            return right - left;
+        });
 
+        return NextResponse.json(all);
     } catch (error) {
-        console.error('Admin fetch content posts error:', error);
+        logError('admin.content_posts.GET', error);
         return NextResponse.json({ error: 'Failed to fetch content posts' }, { status: 500 });
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const payload = await request.json();
         const postInput = payload?.post ?? payload;
@@ -234,71 +220,73 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Judul, slug, dan tipe wajib diisi.' }, { status: 400 });
         }
 
-        const tableName = getTableName(postInput.type);
-
-        const insertPayload: any = {
-            title: postInput.title?.trim(),
-            slug: postInput.slug?.trim(),
+        const config = resolveTypeConfig(postInput.type);
+        const insertPayload: Record<string, any> = {
+            title: sanitizePlainText(postInput.title, 220),
+            slug: String(postInput.slug).trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
             is_published: postInput.isPublished ?? true,
             is_pinned: postInput.isPinned ?? false,
         };
 
-        if (tableName === 'news_posts') {
-            insertPayload.excerpt = postInput.excerpt || null;
-            insertPayload.content = postInput.contentHtml || postInput.content || null;
-            insertPayload.author_name = postInput.authorName || 'Admin';
-            insertPayload.published_at = postInput.publishedAt || new Date().toISOString();
-        } else if (tableName === 'publications') {
-            insertPayload.type = postInput.type === 'publication' ? 'announcement' : postInput.type;
-            insertPayload.description = postInput.description || postInput.excerpt || null;
-            insertPayload.content = postInput.contentHtml || postInput.content || null;
-            insertPayload.published_at = postInput.publishedAt || new Date().toISOString();
-        } else if (tableName === 'achievements') {
-            insertPayload.description = postInput.description || postInput.excerpt || null;
-            insertPayload.event_name = postInput.eventName || null;
-            insertPayload.event_level = postInput.eventLevel || null;
-            insertPayload.rank = postInput.rank || null;
-            insertPayload.achieved_at = postInput.achievedAt || new Date().toISOString().split('T')[0];
-        } else if (tableName === 'galleries') {
-            insertPayload.description = postInput.description || postInput.excerpt || null;
-            insertPayload.event_date = postInput.eventDate || postInput.publishedAt || new Date().toISOString().split('T')[0];
+        if (!insertPayload.title || !insertPayload.slug) {
+            return NextResponse.json({ error: 'Judul atau slug tidak valid.' }, { status: 400 });
         }
 
-        const { data: created, error } = await dbAdmin()
-            .from(tableName)
-            .insert(insertPayload)
-            .select('*')
-            .single();
+        if (config.model === 'news_posts') {
+            insertPayload.excerpt = sanitizePlainText(postInput.excerpt, 500);
+            insertPayload.content = sanitizeRichText(postInput.contentHtml || postInput.content);
+            insertPayload.author_name = sanitizePlainText(postInput.authorName, 120) || 'Admin';
+            insertPayload.published_at = toDateOrUndefined(postInput.publishedAt) || new Date();
+        } else if (config.model === 'publications') {
+            insertPayload.type = normalizePublicationSubtype(postInput.type);
+            insertPayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            insertPayload.content = sanitizeRichText(postInput.contentHtml || postInput.content);
+            insertPayload.published_at = toDateOrUndefined(postInput.publishedAt) || new Date();
+        } else if (config.model === 'achievements') {
+            insertPayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            insertPayload.event_name = sanitizePlainText(postInput.eventName, 150);
+            insertPayload.event_level = sanitizePlainText(postInput.eventLevel, 80);
+            insertPayload.rank = sanitizePlainText(postInput.rank, 80);
+            insertPayload.achieved_at = toDateOrUndefined(postInput.achievedAt) || new Date();
+        } else if (config.model === 'galleries') {
+            insertPayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            insertPayload.event_date = toDateOrUndefined(postInput.eventDate || postInput.publishedAt) || new Date();
+        } else if (config.model === 'downloads') {
+            insertPayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            insertPayload.file_url = postInput.fileUrl || null;
+            insertPayload.file_type = sanitizePlainText(postInput.fileType, 120);
+            insertPayload.file_size_kb = postInput.fileSizeKb ?? null;
+        }
 
-        if (error) throw error;
-
-        // Handle Media
-        if (Array.isArray(mediaInput) && mediaInput.length > 0) {
-            const entityType: EntityType = tableName === 'news_posts' ? 'news' :
-                tableName === 'publications' ? 'publication' :
-                    tableName === 'achievements' ? 'achievement' :
-                        tableName === 'galleries' ? 'gallery' : 'download';
-
-            const normalizedMedia = buildMediaPayload(
-                created.id,
-                entityType,
+        const created = await prisma.$transaction(async (tx) => {
+            const post = await (tx as any)[config.model].create({ data: insertPayload });
+            const mediaRows = buildMediaPayload({
+                entityId: post.id,
+                entityType: config.entityType,
                 mediaInput,
-                postInput.coverUrl
-            );
+                coverUrlInput: postInput.coverUrl,
+            });
 
-            if (normalizedMedia.length) {
-                await dbAdmin().from('media_items').insert(normalizedMedia);
+            if (mediaRows.length > 0) {
+                await tx.media_items.createMany({ data: mediaRows });
             }
-        }
+
+            return post;
+        });
 
         return NextResponse.json({ post: created });
     } catch (error) {
-        console.error('Admin create content post error:', error);
+        logError('admin.content_posts.POST', error);
         return NextResponse.json({ error: 'Failed to create content post' }, { status: 500 });
     }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const payload = await request.json();
         const postInput = payload?.post ?? payload;
@@ -311,71 +299,76 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: 'Judul, slug, dan tipe wajib diisi.' }, { status: 400 });
         }
 
-        const tableName = getTableName(postInput.type);
+        const config = resolveTypeConfig(postInput.type);
 
-        const updatePayload: any = {
-            title: postInput.title?.trim(),
-            slug: postInput.slug?.trim(),
+        const updatePayload: Record<string, any> = {
+            title: sanitizePlainText(postInput.title, 220),
+            slug: String(postInput.slug).trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
             is_published: postInput.isPublished ?? true,
             is_pinned: postInput.isPinned ?? false,
         };
-
-        if (tableName === 'news_posts') {
-            updatePayload.excerpt = postInput.excerpt || null;
-            updatePayload.content = postInput.contentHtml || postInput.content || null;
-            updatePayload.author_name = postInput.authorName || 'Admin';
-            updatePayload.published_at = postInput.publishedAt || postInput.published_at || new Date().toISOString();
-        } else if (tableName === 'publications') {
-            updatePayload.type = postInput.type === 'publication' ? 'announcement' : postInput.type;
-            updatePayload.description = postInput.description || postInput.excerpt || null;
-            updatePayload.content = postInput.contentHtml || postInput.content || null;
-            updatePayload.published_at = postInput.publishedAt || postInput.published_at || new Date().toISOString();
-        } else if (tableName === 'achievements') {
-            updatePayload.description = postInput.description || postInput.excerpt || null;
-            updatePayload.event_name = postInput.eventName || null;
-            updatePayload.event_level = postInput.eventLevel || null;
-            updatePayload.rank = postInput.rank || null;
-            updatePayload.achieved_at = postInput.achievedAt || new Date().toISOString().split('T')[0];
-        } else if (tableName === 'galleries') {
-            updatePayload.description = postInput.description || postInput.excerpt || null;
-            updatePayload.event_date = postInput.eventDate || postInput.publishedAt || new Date().toISOString().split('T')[0];
+        if (!updatePayload.title || !updatePayload.slug) {
+            return NextResponse.json({ error: 'Judul atau slug tidak valid.' }, { status: 400 });
         }
 
-        const { data: updated, error } = await dbAdmin()
-            .from(tableName)
-            .update(updatePayload)
-            .eq('id', postInput.id)
-            .select('*')
-            .single();
+        if (config.model === 'news_posts') {
+            updatePayload.excerpt = sanitizePlainText(postInput.excerpt, 500);
+            updatePayload.content = sanitizeRichText(postInput.contentHtml || postInput.content);
+            updatePayload.author_name = sanitizePlainText(postInput.authorName, 120) || 'Admin';
+            updatePayload.published_at = toDateOrUndefined(postInput.publishedAt || postInput.published_at) || new Date();
+        } else if (config.model === 'publications') {
+            updatePayload.type = normalizePublicationSubtype(postInput.type);
+            updatePayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            updatePayload.content = sanitizeRichText(postInput.contentHtml || postInput.content);
+            updatePayload.published_at = toDateOrUndefined(postInput.publishedAt || postInput.published_at) || new Date();
+        } else if (config.model === 'achievements') {
+            updatePayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            updatePayload.event_name = sanitizePlainText(postInput.eventName, 150);
+            updatePayload.event_level = sanitizePlainText(postInput.eventLevel, 80);
+            updatePayload.rank = sanitizePlainText(postInput.rank, 80);
+            updatePayload.achieved_at = toDateOrUndefined(postInput.achievedAt) || new Date();
+        } else if (config.model === 'galleries') {
+            updatePayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            updatePayload.event_date = toDateOrUndefined(postInput.eventDate || postInput.publishedAt) || new Date();
+        } else if (config.model === 'downloads') {
+            updatePayload.description = sanitizePlainText(postInput.description || postInput.excerpt, 800);
+            updatePayload.file_url = postInput.fileUrl || null;
+            updatePayload.file_type = sanitizePlainText(postInput.fileType, 120);
+            updatePayload.file_size_kb = postInput.fileSizeKb ?? null;
+        }
 
-        if (error) throw error;
+        const updated = await prisma.$transaction(async (tx) => {
+            const post = await (tx as any)[config.model].update({
+                where: { id: postInput.id },
+                data: updatePayload,
+            });
 
-        // Handle Media Refresh
-        if (Array.isArray(mediaInput)) {
-            const entityType: EntityType = tableName === 'news_posts' ? 'news' :
-                tableName === 'publications' ? 'publication' :
-                    tableName === 'achievements' ? 'achievement' :
-                        tableName === 'galleries' ? 'gallery' : 'download';
+            if (Array.isArray(mediaInput)) {
+                await tx.media_items.deleteMany({
+                    where: {
+                        entity_id: post.id,
+                        entity_type: config.entityType,
+                    },
+                });
 
-            // Delete existing
-            await dbAdmin().from('media_items').delete().eq('entity_id', updated.id).eq('entity_type', entityType);
+                const mediaRows = buildMediaPayload({
+                    entityId: post.id,
+                    entityType: config.entityType,
+                    mediaInput,
+                    coverUrlInput: postInput.coverUrl,
+                });
 
-            const normalizedMedia = buildMediaPayload(
-                updated.id,
-                entityType,
-                mediaInput,
-                postInput.coverUrl
-            );
-
-            if (normalizedMedia.length) {
-                await dbAdmin().from('media_items').insert(normalizedMedia);
+                if (mediaRows.length > 0) {
+                    await tx.media_items.createMany({ data: mediaRows });
+                }
             }
-        }
+
+            return post;
+        });
 
         return NextResponse.json({ post: updated });
     } catch (error) {
-        console.error('Admin update content post error:', error);
+        logError('admin.content_posts.PUT', error);
         return NextResponse.json({ error: 'Failed to update content post' }, { status: 500 });
     }
 }
-

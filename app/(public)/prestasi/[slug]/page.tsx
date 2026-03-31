@@ -97,21 +97,21 @@ const AchievementDetailPage: React.FC = () => {
             <article className="pt-10 pb-20">
                 {/* Header Back Button & Share */}
                 <div className="container mx-auto px-4 max-w-5xl mb-8 flex justify-between items-center">
-                <button
-                    onClick={() => router.back()}
-                    className="inline-flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm group hover:scale-105 transition"
-                >
-                    <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-                    KEMBALI
-                </button>
-                <button
-                    onClick={handleShare}
-                    className="p-3 bg-emerald-50 dark:bg-white/5 text-emerald-600 dark:text-emerald-400 rounded-full hover:bg-emerald-100 transition"
-                    title="Bagikan"
-                >
-                    <Share2 size={20} />
-                </button>
-            </div>
+                    <button
+                        onClick={() => router.back()}
+                        className="inline-flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm group hover:scale-105 transition"
+                    >
+                        <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                        KEMBALI
+                    </button>
+                    <button
+                        onClick={handleShare}
+                        className="p-3 bg-emerald-50 dark:bg-white/5 text-emerald-600 dark:text-emerald-400 rounded-full hover:bg-emerald-100 transition"
+                        title="Bagikan"
+                    >
+                        <Share2 size={20} />
+                    </button>
+                </div>
 
                 <div className="container mx-auto px-4 max-w-5xl">
                     {/* Hero Section */}
@@ -123,126 +123,114 @@ const AchievementDetailPage: React.FC = () => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
 
-                    <div className="absolute bottom-0 left-0 w-full p-6 md:p-12">
-                        <div className="flex flex-wrap items-center gap-3 mb-4">
-                            {achievement.rank && (
-                                <span className="px-4 py-1.5 bg-yellow-500 text-white text-sm font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-2">
-                                    <Medal size={16} /> {achievement.rank}
+                        <div className="absolute bottom-0 left-0 w-full p-6 md:p-12">
+                            <div className="flex flex-wrap items-center gap-3 mb-4">
+                                {achievement.rank && (
+                                    <span className="px-4 py-1.5 bg-yellow-500 text-white text-sm font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-2">
+                                        <Medal size={16} /> {achievement.rank}
+                                    </span>
+                                )}
+                                <span className="px-4 py-1.5 bg-emerald-600 text-white text-sm font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-2">
+                                    <Trophy size={16} /> {achievement.eventLevel || 'Prestasi'}
                                 </span>
-                            )}
-                            <span className="px-4 py-1.5 bg-emerald-600 text-white text-sm font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-2">
-                                <Trophy size={16} /> {achievement.eventLevel || 'Prestasi'}
-                            </span>
-                        </div>
-                        <h1 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight drop-shadow-md">
-                            {achievement.title}
-                        </h1>
-                        <div className="flex flex-wrap items-center gap-6 text-white/80 font-bold text-sm">
-                            <div className="flex items-center gap-2">
-                                <Calendar size={18} className="text-emerald-400" />
-                                <span>{new Date(achievement.achievedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                             </div>
-                            {achievement.eventName && (
+                            <h1 className="text-3xl md:text-5xl font-black text-white mb-4 leading-tight drop-shadow-md">
+                                {achievement.title}
+                            </h1>
+                            <div className="flex flex-wrap items-center gap-6 text-white/80 font-bold text-sm">
                                 <div className="flex items-center gap-2">
-                                    <MapPin size={18} className="text-emerald-400" />
-                                    <span>Event: {achievement.eventName}</span>
+                                    <Calendar size={18} className="text-emerald-400" />
+                                    <span>{new Date(achievement.achievedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Main Content Area */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                    <div className="lg:col-span-12">
-                        {/* Rich Content */}
-                        <div className="bg-white dark:bg-[#151B16] rounded-[3rem] p-8 md:p-14 shadow-xl border border-emerald-900/5 dark:border-white/5">
-                            {achievement.description && (
-                                <div className="mb-10 text-xl md:text-2xl font-medium text-emerald-900/70 dark:text-white/80 leading-relaxed border-l-4 border-emerald-500 pl-8 italic">
-                                    "{achievement.description}"
-                                </div>
-                            )}
-
-                            {/* Additional Content (if any) */}
-                            {achievement.content && (
-                                <div
-                                    className="prose prose-lg dark:prose-invert max-w-none 
-                                    prose-headings:font-black prose-headings:text-emerald-950 dark:prose-headings:text-white
-                                    prose-p:text-emerald-900/70 dark:prose-p:text-white/70 prose-p:leading-loose
-                                    prose-img:rounded-3xl prose-img:shadow-2xl
-                                    prose-strong:text-emerald-900 dark:prose-strong:text-emerald-400 prose-strong:font-black"
-                                    dangerouslySetInnerHTML={{ __html: achievement.content }}
-                                />
-                            )}
-
-                            {imageItems.length > 0 && (
-                                <div className="mt-12">
-                                    <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Dokumentasi Lainnya</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                        {imageItems.map((media, idx) => (
-                                            <div
-                                                key={media.id}
-                                                className="rounded-2xl overflow-hidden aspect-square cursor-pointer group"
-                                                onClick={() => setActiveImage(idx)}
-                                            >
-                                                <img
-                                                    src={media.mediaUrl}
-                                                    alt={media.caption || ''}
-                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                                />
-                                            </div>
-                                        ))}
+                                {achievement.eventName && (
+                                    <div className="flex items-center gap-2">
+                                        <MapPin size={18} className="text-emerald-400" />
+                                        <span>Event: {achievement.eventName}</span>
                                     </div>
-                                </div>
-                            )}
-
-                            {videoItems.length > 0 && (
-                                <div className="mt-12">
-                                    <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Video Terkait</h3>
-                                    <div className="grid grid-cols-1 gap-6">
-                                        {videoItems.map((media) => (
-                                            <div key={media.id} className="rounded-2xl overflow-hidden border border-emerald-900/5 dark:border-white/5 bg-black/5">
-                                                {media.mediaType === 'video' ? (
-                                                    <video controls className="w-full aspect-video bg-black">
-                                                        <source src={media.mediaUrl} />
-                                                    </video>
-                                                ) : (
-                                                    media.mediaUrl.includes('<iframe') ? (
-                                                        <div
-                                                            className="aspect-video [&_iframe]:h-full [&_iframe]:w-full"
-                                                            dangerouslySetInnerHTML={{ __html: media.mediaUrl }}
-                                                        />
-                                                    ) : (
-                                                        <iframe
-                                                            src={media.mediaUrl}
-                                                            className="w-full aspect-video"
-                                                            allowFullScreen
-                                                        />
-                                                    )
-                                                )}
-                                                {media.caption && (
-                                                    <div className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 border-t border-emerald-900/5 dark:border-white/5">
-                                                        {media.caption}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer Info */}
-                        <div className="mt-12 flex flex-col items-center justify-center py-12 border-t border-emerald-900/5 dark:border-white/5 text-center">
-                            <div className="w-16 h-16 bg-emerald-50 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 text-emerald-600">
-                                <Award size={32} />
+                                )}
                             </div>
-                            <h4 className="text-emerald-900 dark:text-white font-black uppercase tracking-widest text-sm mb-2">Terima Kasih Atas Inspirasinya</h4>
-                            <p className="text-emerald-900/40 dark:text-white/40 text-xs font-bold font-mono">ID: ACH-{achievement.id?.slice(0, 8)}</p>
+                        </div>
+                    </div>
+
+                    {/* Main Content Area */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                        <div className="lg:col-span-12">
+                            {/* Rich Content */}
+                            <div className="bg-white dark:bg-[#151B16] rounded-[3rem] p-8 md:p-14 shadow-xl border border-emerald-900/5 dark:border-white/5">
+                                {achievement.description && (
+                                    <div className="mb-10 text-xl md:text-2xl font-medium text-emerald-900/70 dark:text-white/80 leading-relaxed border-l-4 border-emerald-500 pl-8 italic">
+                                        &ldquo;{achievement.description}&rdquo;
+                                    </div>
+                                )}
+
+                                {imageItems.length > 0 && (
+                                    <div className="mt-12">
+                                        <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Dokumentasi Lainnya</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            {imageItems.map((media, idx) => (
+                                                <div
+                                                    key={media.id}
+                                                    className="rounded-2xl overflow-hidden aspect-square cursor-pointer group"
+                                                    onClick={() => setActiveImage(idx)}
+                                                >
+                                                    <img
+                                                        src={media.mediaUrl}
+                                                        alt={media.caption || ''}
+                                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {videoItems.length > 0 && (
+                                    <div className="mt-12">
+                                        <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Video Terkait</h3>
+                                        <div className="grid grid-cols-1 gap-6">
+                                            {videoItems.map((media) => (
+                                                <div key={media.id} className="rounded-2xl overflow-hidden border border-emerald-900/5 dark:border-white/5 bg-black/5">
+                                                    {media.mediaType === 'video' ? (
+                                                        <video controls className="w-full aspect-video bg-black">
+                                                            <source src={media.mediaUrl} />
+                                                        </video>
+                                                    ) : (
+                                                        media.mediaUrl.includes('<iframe') ? (
+                                                            <div
+                                                                className="aspect-video [&_iframe]:h-full [&_iframe]:w-full"
+                                                                dangerouslySetInnerHTML={{ __html: media.mediaUrl }}
+                                                            />
+                                                        ) : (
+                                                            <iframe
+                                                                src={media.mediaUrl}
+                                                                className="w-full aspect-video"
+                                                                allowFullScreen
+                                                            />
+                                                        )
+                                                    )}
+                                                    {media.caption && (
+                                                        <div className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 border-t border-emerald-900/5 dark:border-white/5">
+                                                            {media.caption}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer Info */}
+                            <div className="mt-12 flex flex-col items-center justify-center py-12 border-t border-emerald-900/5 dark:border-white/5 text-center">
+                                <div className="w-16 h-16 bg-emerald-50 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 text-emerald-600">
+                                    <Award size={32} />
+                                </div>
+                                <h4 className="text-emerald-900 dark:text-white font-black uppercase tracking-widest text-sm mb-2">Terima Kasih Atas Inspirasinya</h4>
+                                <p className="text-emerald-900/40 dark:text-white/40 text-xs font-bold font-mono">ID: ACH-{achievement.id?.slice(0, 8)}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
             </article>
 
             {activeImage !== null && imageItems.length > 0 && (

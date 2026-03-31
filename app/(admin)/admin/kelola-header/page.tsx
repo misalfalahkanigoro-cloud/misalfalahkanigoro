@@ -1,17 +1,16 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import SidebarAdmin from '@/components/sidebar-admin';
-import { CldUploadWidget } from '@/components/r2-upload-widget';
-
-type SiteSettingsForm = {
-    school_name: string;
-    school_logo_url: string;
-    school_address: string;
-    school_phone: string;
-    school_email: string;
-    school_whatsapp: string;
-};
+import HeaderAdmin from '@/components/header-admin';
+import { 
+    Plus, Save, Trash2, ChevronUp, ChevronDown, 
+    MoreVertical, Link2, Type, Layout, 
+    MousePointer2, Sparkles, RefreshCcw, 
+    CheckCircle2, AlertCircle, Info, Zap,
+    Layers, GripVertical, Settings2
+} from 'lucide-react';
 
 type NavItem = {
     id: string;
@@ -53,40 +52,15 @@ const getNextOrder = (items: NavItem[], parentId: string | null) => {
 };
 
 const KelolaHeaderPage: React.FC = () => {
-    const [settings, setSettings] = useState<SiteSettingsForm>({
-        school_name: '',
-        school_logo_url: '',
-        school_address: '',
-        school_phone: '',
-        school_email: '',
-        school_whatsapp: '',
-    });
     const [navItems, setNavItems] = useState<NavItem[]>([]);
     const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<string | null>(null);
-    const canUpload = true;
+    const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [settingsRes, navRes] = await Promise.all([
-                    fetch('/api/admin/site-settings'),
-                    fetch('/api/admin/navigation-menu'),
-                ]);
-
-                const settingsData = await settingsRes.json();
+                const navRes = await fetch('/api/admin/navigation-menu');
                 const navData = await navRes.json();
-
-                if (settingsData) {
-                    setSettings({
-                        school_name: settingsData.school_name || '',
-                        school_logo_url: settingsData.school_logo_url || '',
-                        school_address: settingsData.school_address || '',
-                        school_phone: settingsData.school_phone || '',
-                        school_email: settingsData.school_email || '',
-                        school_whatsapp: settingsData.school_whatsapp || '',
-                    });
-                }
 
                 if (Array.isArray(navData)) {
                     const mapped = navData.map((item: any) => ({
@@ -99,7 +73,7 @@ const KelolaHeaderPage: React.FC = () => {
                     setNavItems(normalizeOrders(mapped));
                 }
             } catch (error) {
-                console.error('Failed to load header data', error);
+                console.error('Failed to load navigation data', error);
             }
         };
 
@@ -110,22 +84,6 @@ const KelolaHeaderPage: React.FC = () => {
         () => sortByOrder(navItems.filter((item) => !item.parent_id)),
         [navItems]
     );
-
-    const handleLogoUpload = (result: any) => {
-        if (result?.event !== 'success') return;
-        const info = result.info;
-        let secureUrl: string | undefined;
-        
-        if (typeof info === 'string') {
-            secureUrl = info;
-        } else if (info && typeof info === 'object') {
-            secureUrl = info.secure_url || info.url;
-        }
-        
-        if (secureUrl) {
-            setSettings((prev) => ({ ...prev, school_logo_url: secureUrl }));
-        }
-    };
 
     const addNavItem = (parentId: string | null) => {
         setNavItems((prev) => {
@@ -146,6 +104,7 @@ const KelolaHeaderPage: React.FC = () => {
     };
 
     const removeNavItem = (id: string) => {
+        if (!window.confirm('Hapus menu ini beserta seluruh submenu-nya?')) return;
         setNavItems((prev) =>
             normalizeOrders(prev.filter((item) => item.id !== id && item.parent_id !== id))
         );
@@ -160,51 +119,37 @@ const KelolaHeaderPage: React.FC = () => {
     const setParentType = (id: string, type: 'dropdown' | 'button') => {
         setNavItems((prev) => {
             const parent = prev.find((item) => item.id === id);
-            if (!parent) {
-                return prev;
-            }
+            if (!parent) return prev;
 
             if (type === 'button') {
                 const hrefValue = parent.href && parent.href.trim().length ? parent.href.trim() : '/halaman';
                 const pruned = prev.filter((item) => item.id === id || item.parent_id !== id);
-                const updated = pruned.map((item) =>
+                return normalizeOrders(pruned.map((item) =>
                     item.id === id ? { ...item, href: hrefValue } : item
-                );
-                return normalizeOrders(updated);
+                ));
             }
 
-            const updated = prev.map((item) =>
+            return normalizeOrders(prev.map((item) =>
                 item.id === id ? { ...item, href: null } : item
-            );
-            return normalizeOrders(updated);
+            ));
         });
     };
 
     const moveNavItem = (id: string, direction: 'up' | 'down') => {
         setNavItems((prev) => {
             const target = prev.find((item) => item.id === id);
-            if (!target) {
-                return prev;
-            }
+            if (!target) return prev;
 
             const siblings = sortByOrder(prev.filter((item) => item.parent_id === target.parent_id));
             const index = siblings.findIndex((item) => item.id === id);
             const swapWith = direction === 'up' ? siblings[index - 1] : siblings[index + 1];
-            if (!swapWith) {
-                return prev;
-            }
+            if (!swapWith) return prev;
 
-            const updated = prev.map((item) => {
-                if (item.id === target.id) {
-                    return { ...item, display_order: swapWith.display_order };
-                }
-                if (item.id === swapWith.id) {
-                    return { ...item, display_order: target.display_order };
-                }
+            return normalizeOrders(prev.map((item) => {
+                if (item.id === target.id) return { ...item, display_order: swapWith.display_order };
+                if (item.id === swapWith.id) return { ...item, display_order: target.display_order };
                 return item;
-            });
-
-            return normalizeOrders(updated);
+            }));
         });
     };
 
@@ -214,256 +159,316 @@ const KelolaHeaderPage: React.FC = () => {
         try {
             const normalizedItems = normalizeOrders(navItems);
             setNavItems(normalizedItems);
-            const [settingsRes, navRes] = await Promise.all([
-                fetch('/api/admin/site-settings', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(settings),
-                }),
-                fetch('/api/admin/navigation-menu', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items: normalizedItems.map((item) => ({
+            const navRes = await fetch('/api/admin/navigation-menu', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    items: normalizedItems.map((item) => ({
                         ...item,
                         href: item.href && item.href.trim().length ? item.href.trim() : null,
                         display_order: item.display_order,
                         is_active: true,
-                    })) }),
+                    }))
                 }),
-            ]);
+            });
 
-            if (!settingsRes.ok || !navRes.ok) {
-                const [settingsErr, navErr] = await Promise.all([
-                    settingsRes.json().catch(() => ({})),
-                    navRes.json().catch(() => ({})),
-                ]);
-                throw new Error(
-                    settingsErr.error ||
-                    navErr.error ||
-                    'Failed to save'
-                );
-            }
-
-            setMessage('Perubahan header berhasil disimpan.');
+            if (!navRes.ok) throw new Error('Failed to save navigation menu');
+            setMessage({ text: 'Menu navigasi berhasil disinkronkan.', type: 'success' });
+            setTimeout(() => setMessage(null), 5000);
         } catch (error) {
-            console.error(error);
-            setMessage('Gagal menyimpan perubahan.');
+            setMessage({ text: 'Terjadi kesalahan sistem saat menyimpan.', type: 'error' });
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#080B09] text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80 space-y-8">
-                <div className="rounded-3xl border border-emerald-900/20 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-white/5">
-                    <h2 className="text-2xl font-semibold">Kelola Header</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Atur identitas sekolah, logo, dan navigasi.</p>
-
-                    <div className="mt-8 grid gap-6 lg:grid-cols-2">
-                        <div className="space-y-4">
-                            <label className="text-sm font-semibold">Nama Sekolah</label>
-                            <input
-                                value={settings.school_name}
-                                onChange={(e) => setSettings({ ...settings, school_name: e.target.value })}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 dark:border-white/10 dark:bg-black/30 dark:text-white"
-                            />
-
-                            <label className="text-sm font-semibold">Alamat</label>
-                            <input
-                                value={settings.school_address}
-                                onChange={(e) => setSettings({ ...settings, school_address: e.target.value })}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 dark:border-white/10 dark:bg-black/30 dark:text-white"
-                            />
-
-                            <label className="text-sm font-semibold">Telepon</label>
-                            <input
-                                value={settings.school_phone}
-                                onChange={(e) => setSettings({ ...settings, school_phone: e.target.value })}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 dark:border-white/10 dark:bg-black/30 dark:text-white"
-                            />
-
-                            <label className="text-sm font-semibold">Email</label>
-                            <input
-                                value={settings.school_email}
-                                onChange={(e) => setSettings({ ...settings, school_email: e.target.value })}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 dark:border-white/10 dark:bg-black/30 dark:text-white"
-                            />
-
-                            <label className="text-sm font-semibold">WhatsApp</label>
-                            <input
-                                value={settings.school_whatsapp}
-                                onChange={(e) => setSettings({ ...settings, school_whatsapp: e.target.value })}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 dark:border-white/10 dark:bg-black/30 dark:text-white"
-                            />
-                        </div>
-
-                        <div className="space-y-4">
-                            <label className="text-sm font-semibold">Logo</label>
-                            <div className="flex items-center gap-4">
-                                <div className="h-20 w-20 rounded-2xl bg-gray-100 dark:bg-white/10 overflow-hidden flex items-center justify-center">
-                                    {settings.school_logo_url ? (
-                                        <img src={settings.school_logo_url} alt="Logo" className="h-full w-full object-cover" />
-                                    ) : (
-                                        <span className="text-xs text-gray-400">Belum ada</span>
-                                    )}
-                                </div>
-                                {canUpload ? (
-                                    <CldUploadWidget
-                                        options={{ folder: 'mis-al-falah/header' }}
-                                        onSuccess={handleLogoUpload}
-                                    >
-                                        {({ open }) => (
-                                            <button
-                                                type="button"
-                                                onClick={() => open()}
-                                                className="rounded-lg border border-emerald-600 px-4 py-2 text-sm text-emerald-600"
-                                            >
-                                                Upload Logo
-                                            </button>
-                                        )}
-                                    </CldUploadWidget>
-                                ) : null}
+            <main className="min-h-screen lg:pl-64 pb-24">
+                <HeaderAdmin 
+                    title="Navigation Engine"
+                    subtitle="Arsitektur menu header, hirarki navigasi, dan kebijakan redirect MI Alfalah"
+                    action={
+                        <div className="bg-emerald-500/10 dark:bg-emerald-500/10 px-8 py-3 rounded-2xl flex items-center gap-4 border border-emerald-500/20 shadow-inner group overflow-hidden relative">
+                            <div className="absolute inset-0 bg-emerald-500/5 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                            <Sparkles size={18} className="text-emerald-600 animate-pulse" />
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-400 tracking-[0.2em] uppercase leading-none mb-1">Live Preview Enabled</span>
+                                <span className="text-[8px] font-black text-emerald-500/60 tracking-widest uppercase leading-none italic">Header Sync: Active</span>
                             </div>
-
                         </div>
-                    </div>
-                </div>
+                    }
+                />
 
-                <div className="rounded-3xl border border-emerald-900/20 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-white/5">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-xl font-semibold">Menu Navigasi</h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Atur tombol header, dropdown, dan urutan menu.</p>
+                <section className="px-4 sm:px-10 mt-12 max-w-7xl mx-auto space-y-10">
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white/70 dark:bg-[#151b18]/80 backdrop-blur-3xl rounded-[4rem] border border-white dark:border-white/10 shadow-3xl overflow-hidden"
+                    >
+                        <div className="p-10 lg:p-14 border-b border-gray-100 dark:border-white/5 bg-white/50 dark:bg-transparent">
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+                                <div className="flex items-center gap-6">
+                                    <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-[1.75rem] text-emerald-600 shadow-inner">
+                                        <Layers size={28} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-black font-fraunces text-gray-950 dark:text-white uppercase tracking-tight leading-none mb-2">Structure Manager</h2>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] italic">
+                                            Manajemen hirarki menu tingkat makro & mikro
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => addNavItem(null)}
+                                    className="inline-flex items-center gap-4 bg-emerald-600 text-white px-8 py-4 rounded-[1.75rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-emerald-500/30 hover:bg-emerald-500 hover:-translate-y-1 active:scale-95 group"
+                                >
+                                    <Plus size={20} className="group-hover:rotate-90 transition-transform duration-500" /> ATTACH PRIMARY MENU
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-10 lg:p-14 space-y-10">
+                            <AnimatePresence mode="popLayout">
+                                {parentItems.length === 0 ? (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="flex flex-col items-center justify-center py-24 text-center bg-gray-50/50 dark:bg-black/20 rounded-[3rem] border border-dashed border-gray-100 dark:border-white/5"
+                                    >
+                                        <div className="w-24 h-24 bg-white dark:bg-white/5 rounded-[2.5rem] flex items-center justify-center text-gray-300 mb-8 shadow-inner animate-pulse">
+                                            <MousePointer2 size={48} className="opacity-20" />
+                                        </div>
+                                        <h4 className="text-lg font-black font-fraunces text-gray-900 dark:text-white uppercase tracking-tight mb-2">No active endpoints</h4>
+                                        <p className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] italic max-w-xs leading-relaxed">
+                                            Header masih bersifat statis atau kosong. Tambahkan menu utama untuk memulai sinkronisasi.
+                                        </p>
+                                    </motion.div>
+                                ) : (
+                                    parentItems.map((parent, idx) => {
+                                        const childItems = sortByOrder(navItems.filter((item) => item.parent_id === parent.id));
+                                        const isDropdown = childItems.length > 0 || !parent.href;
+                                        
+                                        return (
+                                            <motion.div 
+                                                key={parent.id}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                className="group/card relative bg-gray-50/50 dark:bg-black/20 rounded-[3rem] border border-gray-100 dark:border-white/5 p-8 lg:p-10 transition-all hover:bg-white dark:hover:bg-white/5 hover:shadow-2xl hover:shadow-emerald-500/5"
+                                            >
+                                                <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-end">
+                                                    <div className="flex-1 grid lg:grid-cols-12 gap-8 w-full">
+                                                        <div className="lg:col-span-5 space-y-4">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] ml-4 flex items-center gap-2">
+                                                                <Type size={12} className="opacity-50" /> MENU IDENTITY
+                                                            </label>
+                                                            <input
+                                                                value={parent.label}
+                                                                onChange={(e) => updateNavItem(parent.id, 'label', e.target.value)}
+                                                                className="w-full rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-black/40 px-6 py-4 text-sm font-black text-gray-900 dark:text-white focus:ring-4 focus:ring-emerald-500/5 outline-none shadow-inner transition-all border-emerald-500/0 focus:border-emerald-500"
+                                                                placeholder="e.g. Academic Portal"
+                                                            />
+                                                        </div>
+                                                        <div className="lg:col-span-3 space-y-4">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] ml-4 flex items-center gap-2">
+                                                                <Settings2 size={12} className="opacity-50" /> PROTOCOL
+                                                            </label>
+                                                            <select
+                                                                value={isDropdown ? 'dropdown' : 'button'}
+                                                                onChange={(e) => setParentType(parent.id, e.target.value as 'dropdown' | 'button')}
+                                                                className="w-full rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-black/40 px-6 py-4 text-sm font-black text-gray-900 dark:text-white focus:ring-4 focus:ring-emerald-500/5 outline-none shadow-inner transition-all border-emerald-500/0 focus:border-emerald-500 appearance-none"
+                                                            >
+                                                                <option value="dropdown" className="dark:bg-[#151b18]">DROPDOWN STACK</option>
+                                                                <option value="button" className="dark:bg-[#151b18]">DIRECT TRIGGER</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="lg:col-span-4 space-y-4">
+                                                            {!isDropdown ? (
+                                                                <>
+                                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] ml-4 flex items-center gap-2">
+                                                                        <Link2 size={12} className="opacity-50" /> DESTINATION URL
+                                                                    </label>
+                                                                    <input
+                                                                        value={parent.href || ''}
+                                                                        onChange={(e) => updateNavItem(parent.id, 'href', e.target.value)}
+                                                                        className="w-full rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-black/40 px-6 py-4 text-sm font-bold text-gray-950 dark:text-white focus:ring-4 focus:ring-emerald-500/5 outline-none shadow-inner transition-all border-emerald-500/0 focus:border-emerald-500"
+                                                                        placeholder="/target-page"
+                                                                    />
+                                                                </>
+                                                            ) : (
+                                                                <div className="h-full flex items-end pb-3">
+                                                                    <button
+                                                                        onClick={() => addNavItem(parent.id)}
+                                                                        className="inline-flex items-center gap-3 bg-white dark:bg-white/5 hover:bg-emerald-600 hover:text-white px-6 py-3 rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border border-gray-100 dark:border-white/10 shadow-sm active:scale-95"
+                                                                    >
+                                                                        <Plus size={14} /> ATTACH SUBNODE
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3 bg-white dark:bg-black/40 p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-inner">
+                                                        <div className="flex flex-col gap-1">
+                                                            <button
+                                                                onClick={() => moveNavItem(parent.id, 'up')}
+                                                                className="p-2.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-white/5 text-gray-400 hover:text-emerald-500 transition-all"
+                                                                title="Move Up"
+                                                            >
+                                                                <ChevronUp size={16} strokeWidth={3} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => moveNavItem(parent.id, 'down')}
+                                                                className="p-2.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-white/5 text-gray-400 hover:text-emerald-500 transition-all"
+                                                                title="Move Down"
+                                                            >
+                                                                <ChevronDown size={16} strokeWidth={3} />
+                                                            </button>
+                                                        </div>
+                                                        <div className="w-px h-10 bg-gray-100 dark:bg-white/5 mx-1" />
+                                                        <button
+                                                            onClick={() => removeNavItem(parent.id)}
+                                                            className="p-4 rounded-2xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-90"
+                                                            title="Purge Link"
+                                                        >
+                                                            <Trash2 size={20} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Children Submenu Area */}
+                                                <AnimatePresence>
+                                                    {childItems.length > 0 && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="mt-10 pl-10 lg:pl-16 space-y-4 relative border-l-2 border-dashed border-gray-100 dark:border-white/5 ml-8"
+                                                        >
+                                                            {childItems.map((child, cIdx) => (
+                                                                <motion.div 
+                                                                    key={child.id}
+                                                                    initial={{ opacity: 0, x: -10 }}
+                                                                    animate={{ opacity: 1, x: 0 }}
+                                                                    transition={{ delay: cIdx * 0.02 }}
+                                                                    className="group/child relative flex flex-col lg:flex-row gap-6 items-center bg-white/50 dark:bg-black/20 p-5 rounded-[2rem] border border-gray-100 dark:border-white/5 hover:border-emerald-500/20 transition-all"
+                                                                >
+                                                                    <div className="absolute -left-10 lg:-left-16 w-10 lg:w-16 h-px bg-gray-100 dark:bg-white/5 flex items-center justify-start">
+                                                                        <div className="w-2 h-2 rounded-full bg-emerald-500/40 -translate-x-1" />
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex-1 grid md:grid-cols-2 gap-6 w-full">
+                                                                        <input
+                                                                            value={child.label}
+                                                                            onChange={(e) => updateNavItem(child.id, 'label', e.target.value)}
+                                                                            className="w-full rounded-xl border border-gray-100 dark:border-white/5 bg-white/80 dark:bg-black/60 px-5 py-3 text-[13px] font-bold text-gray-950 dark:text-white focus:ring-4 focus:ring-emerald-500/5 outline-none shadow-sm transition-all focus:border-emerald-500"
+                                                                            placeholder="Subnode Title"
+                                                                        />
+                                                                        <input
+                                                                            value={child.href || ''}
+                                                                            onChange={(e) => updateNavItem(child.id, 'href', e.target.value)}
+                                                                            className="w-full rounded-xl border border-gray-100 dark:border-white/5 bg-white/80 dark:bg-black/60 px-5 py-3 font-mono text-xs text-emerald-600 dark:text-emerald-400 focus:ring-4 focus:ring-emerald-500/5 outline-none shadow-sm transition-all focus:border-emerald-500"
+                                                                            placeholder="/path/target"
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2 opacity-0 group-hover/child:opacity-100 transition-opacity">
+                                                                        <button
+                                                                            onClick={() => moveNavItem(child.id, 'up')}
+                                                                            className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-white/5 text-gray-400 hover:text-emerald-500 transition-all border border-transparent hover:border-emerald-100"
+                                                                        >
+                                                                            <ChevronUp size={14} strokeWidth={3} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => moveNavItem(child.id, 'down')}
+                                                                            className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-white/5 text-gray-400 hover:text-emerald-500 transition-all border border-transparent hover:border-emerald-100"
+                                                                        >
+                                                                            <ChevronDown size={14} strokeWidth={3} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => removeNavItem(child.id)}
+                                                                            className="p-2 rounded-lg bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </motion.div>
+                                                            ))}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </motion.div>
+                                        );
+                                    })
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </motion.div>
+
+                    {/* Footer Command Section */}
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-10 bg-white/70 dark:bg-[#151b18]/80 backdrop-blur-3xl p-10 lg:p-14 rounded-[4rem] border border-white dark:border-white/10 shadow-3xl">
+                        <div className="flex gap-6 items-center max-w-2xl">
+                            <div className={`p-4 rounded-[1.75rem] shadow-xl ring-4 ring-emerald-500/5 ${message?.type === 'success' ? 'bg-emerald-500 text-white animate-pulse' : 'bg-white dark:bg-white/5 text-emerald-600'}`}>
+                                {message?.type === 'success' ? <CheckCircle2 size={32} /> : <Zap size={32} />}
+                            </div>
+                            <div>
+                                <p className={`text-[11px] font-black uppercase tracking-[0.3em] mb-2 leading-none italic ${message?.type === 'success' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                                    {message?.type === 'success' ? 'SYNC COMPLETED' : 'ENGINE READINESS: STANDBY'}
+                                </p>
+                                <p className="text-sm font-bold text-gray-500 dark:text-gray-400 leading-relaxed uppercase tracking-tight">
+                                    {message?.text || 'Setiap perubahan struktur menu akan meng-override konfigurasi header publik secara instan. Pastikan semua path valid sebelum commit.'}
+                                </p>
+                            </div>
                         </div>
                         <button
-                            onClick={() => addNavItem(null)}
-                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="w-full md:w-auto rounded-[1.75rem] bg-emerald-600 px-14 py-6 text-[11px] font-black text-white uppercase tracking-[0.3em] shadow-2xl shadow-emerald-500/30 hover:bg-emerald-500 hover:-translate-y-1 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-4 group"
                         >
-                            + Parent Menu
+                            {saving ? (
+                                <>
+                                    <RefreshCcw size={18} className="animate-spin" />
+                                    SYNCHRONIZING...
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle2 size={18} />
+                                    COMMIT CONFIGURATION
+                                </>
+                            )}
                         </button>
                     </div>
 
-                    <div className="mt-6 space-y-6">
-                        {parentItems.map((parent) => {
-                            const hasChildren = navItems.some((item) => item.parent_id === parent.id);
-                            const parentType = hasChildren || !parent.href ? 'dropdown' : 'button';
-                            const childItems = sortByOrder(
-                                navItems.filter((item) => item.parent_id === parent.id)
-                            );
-
-                            return (
-                                <div key={parent.id} className="rounded-2xl border border-gray-200 p-4 dark:border-white/10">
-                                    <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                                        <input
-                                            value={parent.label}
-                                            onChange={(e) => updateNavItem(parent.id, 'label', e.target.value)}
-                                            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-black/30"
-                                            placeholder="Nama menu"
-                                        />
-                                        <select
-                                            value={parentType}
-                                            onChange={(e) => setParentType(parent.id, e.target.value as 'dropdown' | 'button')}
-                                            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 dark:border-white/10 dark:bg-black/30 dark:text-gray-200"
-                                        >
-                                            <option value="dropdown">Dropdown</option>
-                                            <option value="button">Tombol</option>
-                                        </select>
-                                        {parentType === 'button' && (
-                                            <input
-                                                value={parent.href || ''}
-                                                onChange={(e) => updateNavItem(parent.id, 'href', e.target.value)}
-                                                className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-black/30"
-                                                placeholder="/tautan"
-                                            />
-                                        )}
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => moveNavItem(parent.id, 'up')}
-                                                className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:text-gray-200"
-                                            >
-                                                Naik
-                                            </button>
-                                            <button
-                                                onClick={() => moveNavItem(parent.id, 'down')}
-                                                className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:text-gray-200"
-                                            >
-                                                Turun
-                                            </button>
-                                        </div>
-                                        {parentType === 'dropdown' && (
-                                            <button
-                                                onClick={() => addNavItem(parent.id)}
-                                                className="rounded-lg border border-emerald-600 px-3 py-2 text-xs text-emerald-600"
-                                            >
-                                                + Submenu
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => removeNavItem(parent.id)}
-                                            className="rounded-lg border border-red-500 px-3 py-2 text-xs text-red-500"
-                                        >
-                                            Hapus
-                                        </button>
-                                    </div>
-
-                                    {childItems.length ? (
-                                        <div className="mt-4 space-y-2">
-                                            {childItems.map((child) => (
-                                                <div key={child.id} className="flex flex-col gap-2 md:flex-row md:items-center">
-                                                    <input
-                                                        value={child.label}
-                                                        onChange={(e) => updateNavItem(child.id, 'label', e.target.value)}
-                                                        className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-black/30"
-                                                        placeholder="Label"
-                                                    />
-                                                    <input
-                                                        value={child.href || ''}
-                                                        onChange={(e) => updateNavItem(child.id, 'href', e.target.value)}
-                                                        className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-black/30"
-                                                        placeholder="/tautan"
-                                                    />
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => moveNavItem(child.id, 'up')}
-                                                            className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:text-gray-200"
-                                                        >
-                                                            Naik
-                                                        </button>
-                                                        <button
-                                                            onClick={() => moveNavItem(child.id, 'down')}
-                                                            className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:text-gray-200"
-                                                        >
-                                                            Turun
-                                                        </button>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => removeNavItem(child.id)}
-                                                        className="rounded-lg border border-red-500 px-3 py-2 text-xs text-red-500"
-                                                    >
-                                                        Hapus
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : null}
+                    <div className="p-10 bg-black dark:bg-[#050706] rounded-[3.5rem] text-white overflow-hidden relative group border border-white/5">
+                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                            <div className="flex items-center gap-6">
+                                <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-500 shadow-inner group-hover:rotate-12 transition-all duration-700">
+                                    <Info size={24} />
                                 </div>
-                            );
-                        })}
+                                <div className="max-w-md">
+                                    <p className="text-[10px] font-black font-fraunces text-emerald-500 uppercase tracking-[0.3em] mb-1.5">UX ADVISORY</p>
+                                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest leading-relaxed italic">
+                                        Rekomendasi performa: Batasi hirarki menu maksimal 2 level (Parent & Child) dan tidak lebih dari 7 menu utama untuk optimasi view port mobile.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-8">
+                                <div className="text-center">
+                                    <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Integrity</p>
+                                    <p className="text-xs font-black text-emerald-500 uppercase tracking-widest">99.9%</p>
+                                </div>
+                                <div className="w-px h-8 bg-white/10" />
+                                <div className="text-center">
+                                    <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Caching</p>
+                                    <p className="text-xs font-black text-white uppercase tracking-widest">ENABLED</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/5 blur-[100px] -translate-y-32 translate-x-32" />
                     </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                    >
-                        {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-                    </button>
-                </div>
+                </section>
             </main>
         </div>
     );

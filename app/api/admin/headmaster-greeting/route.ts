@@ -1,7 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/db';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { sanitizePlainText, sanitizeRichText, sanitizeUrl } from '@/lib/rich-text';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { data, error } = await dbAdmin()
             .from('headmaster_greeting')
@@ -21,7 +28,12 @@ export async function GET() {
     }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const payload = await request.json();
 
@@ -37,14 +49,14 @@ export async function PUT(request: Request) {
         }
 
         const updatePayload = {
-            title: payload.title ?? '',
-            subtitle: payload.subtitle ?? null,
+            title: sanitizePlainText(payload.title, 160) ?? '',
+            subtitle: sanitizePlainText(payload.subtitle, 220) ?? null,
             content_json: payload.content_json ?? payload.contentJson ?? null,
-            content_html: payload.content_html ?? payload.contentHtml ?? null,
-            content_text: payload.content_text ?? payload.contentText ?? null,
-            headmaster_name: payload.headmaster_name ?? payload.headmasterName ?? '',
-            headmaster_title: payload.headmaster_title ?? payload.headmasterTitle ?? null,
-            photo_url: payload.photo_url ?? payload.photoUrl ?? null,
+            content_html: sanitizeRichText(payload.content_html ?? payload.contentHtml),
+            content_text: sanitizePlainText(payload.content_text ?? payload.contentText, 5000),
+            headmaster_name: sanitizePlainText(payload.headmaster_name ?? payload.headmasterName, 120) ?? '',
+            headmaster_title: sanitizePlainText(payload.headmaster_title ?? payload.headmasterTitle, 160) ?? null,
+            photo_url: sanitizeUrl(payload.photo_url ?? payload.photoUrl),
             is_active: payload.is_active ?? payload.isActive ?? true,
         };
 

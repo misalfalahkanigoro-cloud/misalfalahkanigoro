@@ -12,7 +12,7 @@ import prisma from '@/lib/prisma';
 
 type MutationType = 'select' | 'insert' | 'update' | 'delete' | 'upsert';
 type SingleMode = 'single' | 'maybeSingle' | null;
-type SupabaseCountOption = 'exact' | null;
+type StorageCountOption = 'exact' | null;
 
 type QueryResponse<T = any> = {
     data: T | null;
@@ -66,13 +66,19 @@ const normalizePath = (value: string) => value.replace(/^\/+/, '').replace(/\/+$
 
 const joinPath = (prefix: string, name: string) => (prefix ? `${prefix}/${name}` : name);
 
+const resolvePublikwebBucket = () =>
+    (process.env.R2_BUCKET_PUBLIKWEB || process.env.R2_DEFAULT_BUCKET || process.env.R2_BUCKET_MEDIA || 'publikweb').trim();
+
 const resolveBucketName = (bucket: string) => {
-    const normalized = (bucket || process.env.R2_DEFAULT_BUCKET || 'media').trim();
+    const normalized = (bucket || process.env.R2_DEFAULT_BUCKET || 'publikweb').trim();
     if (normalized === 'downloads') {
         return process.env.R2_BUCKET_DOWNLOADS || 'downloads';
     }
     if (normalized === 'media') {
         return process.env.R2_BUCKET_MEDIA || 'media';
+    }
+    if (normalized === 'publikweb') {
+        return resolvePublikwebBucket();
     }
     return normalized;
 };
@@ -381,7 +387,7 @@ class PrismaQueryBuilder implements PromiseLike<QueryResponse<any>> {
 
     private offsetValue: number | null = null;
 
-    private countOption: SupabaseCountOption = null;
+    private countOption: StorageCountOption = null;
 
     private headOnly = false;
 
@@ -393,7 +399,7 @@ class PrismaQueryBuilder implements PromiseLike<QueryResponse<any>> {
 
     private upsertConflict: string | null = null;
 
-    constructor(private readonly table: string) {}
+    constructor(private readonly table: string) { }
 
     select(columns = '*', options?: { count?: 'exact'; head?: boolean }) {
         if (this.operation === 'select') {
@@ -769,8 +775,8 @@ class PrismaQueryBuilder implements PromiseLike<QueryResponse<any>> {
         const updateSql =
             updatableColumns.length > 0
                 ? updatableColumns
-                      .map((column) => `${quoteIdent(column)} = EXCLUDED.${quoteIdent(column)}`)
-                      .join(', ')
+                    .map((column) => `${quoteIdent(column)} = EXCLUDED.${quoteIdent(column)}`)
+                    .join(', ')
                 : `${quoteIdent(conflictColumns[0])} = EXCLUDED.${quoteIdent(conflictColumns[0])}`;
 
         const returning = this.mutationReturning || this.singleMode !== null ? ' RETURNING *' : '';
@@ -824,7 +830,7 @@ class PrismaQueryBuilder implements PromiseLike<QueryResponse<any>> {
 }
 
 class R2BucketClient {
-    constructor(private readonly bucket: string) {}
+    constructor(private readonly bucket: string) { }
 
     async upload(
         path: string,
@@ -1054,7 +1060,7 @@ class R2StorageClient {
     }
 }
 
-class PrismaSupabaseAdapter {
+class PrismaStorageAdapter {
     storage = new R2StorageClient();
 
     from(table: string) {
@@ -1062,46 +1068,13 @@ class PrismaSupabaseAdapter {
     }
 }
 
-const adapter = new PrismaSupabaseAdapter();
+const adapter = new PrismaStorageAdapter();
 
-export const supabaseClient = adapter as any;
-export const supabase = supabaseClient;
+export const dbClient = adapter as any;
+export const db = dbClient;
+export const dbAdmin = () => adapter;
 
-export const supabaseAdmin = () => adapter;
-
-export async function uploadToSupabaseStorage(
-    file: File,
-    bucket = 'downloads'
-): Promise<{ url: string; error: Error | null }> {
-    try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${randomUUID()}.${fileExt || 'bin'}`;
-        const upload = await supabaseAdmin().storage.from(bucket).upload(fileName, file, {
-            upsert: false,
-            contentType: file.type || 'application/octet-stream',
-        });
-
-        if (upload.error) {
-            return { url: '', error: upload.error };
-        }
-
-        const { data } = supabaseAdmin().storage.from(bucket).getPublicUrl(fileName);
-        return { url: data.publicUrl, error: null };
-    } catch (error) {
-        return {
-            url: '',
-            error: error instanceof Error ? error : new Error(String(error)),
-        };
-    }
-}
-
-export async function deleteFromSupabaseStorage(
-    filePath: string,
-    bucket = 'downloads'
-): Promise<{ success: boolean; error: Error | null }> {
-    const response = await supabaseAdmin().storage.from(bucket).remove([filePath]);
-    if (response.error) {
-        return { success: false, error: response.error };
-    }
-    return { success: true, error: null };
-}
+// Sisa kode legacy storage telah dihapus karena proyek telah bermigrasi 100% menggunakan R2.
+export const supabaseClient = dbClient;
+export const supabase = db;
+export const supabaseAdmin = dbAdmin;

@@ -108,6 +108,7 @@ const PrestasiPage: React.FC = () => {
                                 placeholder="Cari judul prestasi..."
                                 className="w-full pl-14 pr-6 py-4 bg-emerald-50/50 dark:bg-white/5 border border-emerald-900/5 dark:border-white/5 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all placeholder:text-gray-400 font-medium"
                             />
+                            <p className="mt-2 text-[11px] text-gray-400">Pencarian berlaku untuk daftar di halaman ini.</p>
                         </div>
                     </div>
 

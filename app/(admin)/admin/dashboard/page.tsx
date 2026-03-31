@@ -4,16 +4,22 @@ import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ArrowUpRight,
-    Bell,
-    Calendar,
     FileText,
-    Image,
+    ImageIcon,
     LayoutGrid,
-    Loader2,
     ShieldCheck,
     Users,
+    Activity,
+    Trophy,
+    Bell,
+    ChevronRight,
+    TrendingUp,
+    Clock,
+    RefreshCw,
+    Zap
 } from 'lucide-react';
 import SidebarAdmin from '@/components/sidebar-admin';
+import HeaderAdmin from '@/components/header-admin';
 
 type DashboardSummary = {
     newsCount: number;
@@ -68,68 +74,65 @@ type DashboardResponse = {
 };
 
 const QUICK_ACTIONS = [
-    { label: 'Kelola Berita', href: '/admin/berita', icon: <FileText className="h-5 w-5" /> },
-    { label: 'Kelola Galeri', href: '/admin/galeri', icon: <Image className="h-5 w-5" /> },
-    { label: 'Kelola PPDB', href: '/admin/ppdb', icon: <LayoutGrid className="h-5 w-5" /> },
-    { label: 'Kelola Publikasi', href: '/admin/publikasi', icon: <Users className="h-5 w-5" /> },
+    { label: 'Kelola Berita', href: '/admin/berita', icon: <FileText className="h-5 w-5" />, color: 'emerald' },
+    { label: 'Album Galeri', href: '/admin/galeri', icon: <ImageIcon className="h-5 w-5" />, color: 'blue' },
+    { label: 'Portal PPDB', href: '/admin/ppdb', icon: <LayoutGrid className="h-5 w-5" />, color: 'indigo' },
+    { label: 'Publikasi', href: '/admin/publikasi', icon: <Users className="h-5 w-5" />, color: 'purple' },
 ];
+
+const STAT_STYLES = {
+    emerald: {
+        icon: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white shadow-emerald-500/10',
+        label: 'text-emerald-600 dark:text-emerald-400',
+        desc: 'text-emerald-600 dark:text-emerald-400/80 bg-emerald-500/5',
+        glow: 'bg-emerald-500/5',
+    },
+    blue: {
+        icon: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white shadow-blue-500/10',
+        label: 'text-blue-600 dark:text-blue-400',
+        desc: 'text-blue-600 dark:text-blue-400/80 bg-blue-500/5',
+        glow: 'bg-blue-500/5',
+    },
+    indigo: {
+        icon: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white shadow-indigo-500/10',
+        label: 'text-indigo-600 dark:text-indigo-400',
+        desc: 'text-indigo-600 dark:text-indigo-400/80 bg-indigo-500/5',
+        glow: 'bg-indigo-500/5',
+    },
+    purple: {
+        icon: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:bg-purple-600 group-hover:text-white shadow-purple-500/10',
+        label: 'text-purple-600 dark:text-purple-400',
+        desc: 'text-purple-600 dark:text-purple-400/80 bg-purple-500/5',
+        glow: 'bg-purple-500/5',
+    },
+} as const;
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('id-ID', {
     dateStyle: 'medium',
     timeStyle: 'short',
 });
 
-const DATE_ONLY_FORMATTER = new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'long',
-});
-
 const toValidDate = (value?: string | number | Date | null) => {
     if (value === undefined || value === null) return null;
-
     let parsed: Date;
-
-    if (value instanceof Date) {
-        parsed = value;
-    } else if (typeof value === 'number') {
-        if (!Number.isFinite(value)) return null;
-        parsed = new Date(value);
-    } else if (typeof value === 'string') {
+    if (value instanceof Date) parsed = value;
+    else if (typeof value === 'number') parsed = new Date(value);
+    else if (typeof value === 'string') {
         const trimmed = value.trim();
         if (!trimmed) return null;
-
         if (/^\d+$/.test(trimmed)) {
             const numeric = Number(trimmed);
-            if (!Number.isFinite(numeric)) return null;
             const normalized = trimmed.length === 10 ? numeric * 1000 : numeric;
             parsed = new Date(normalized);
-        } else {
-            parsed = new Date(trimmed);
-        }
-    } else {
-        return null;
-    }
-
+        } else parsed = new Date(trimmed);
+    } else return null;
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 function formatDateTime(value?: string | number | Date | null) {
     const parsed = toValidDate(value);
     if (!parsed) return '-';
-    try {
-        return DATE_TIME_FORMATTER.format(parsed);
-    } catch {
-        return '-';
-    }
-}
-
-function formatDateOnly(value?: string | number | Date | null) {
-    const parsed = toValidDate(value);
-    if (!parsed) return '-';
-    try {
-        return DATE_ONLY_FORMATTER.format(parsed);
-    } catch {
-        return '-';
-    }
+    try { return DATE_TIME_FORMATTER.format(parsed); } catch { return '-'; }
 }
 
 const AdminDashboardPage: React.FC = () => {
@@ -143,11 +146,8 @@ const AdminDashboardPage: React.FC = () => {
         if (!raw) return;
         try {
             const parsed = JSON.parse(raw) as { fullName?: string; username?: string };
-            const name = (parsed.fullName || parsed.username || 'Admin').trim();
-            if (name) setAdminName(name);
-        } catch {
-            setAdminName('Admin');
-        }
+            setAdminName((parsed.fullName || parsed.username || 'Admin').trim());
+        } catch { setAdminName('Admin'); }
     }, []);
 
     useEffect(() => {
@@ -157,211 +157,253 @@ const AdminDashboardPage: React.FC = () => {
             setError(null);
             try {
                 const res = await fetch('/api/admin/dashboard', { cache: 'no-store' });
-                const json = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    throw new Error(json.error || 'Gagal memuat dashboard');
-                }
-                if (active) {
-                    setData(json as DashboardResponse);
-                }
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.error || 'Gagal memuat dashboard');
+                if (active) setData(json as DashboardResponse);
             } catch (err) {
-                if (active) {
-                    setError(err instanceof Error ? err.message : 'Gagal memuat dashboard');
-                }
+                if (active) setError(err instanceof Error ? err.message : 'Gagal memuat dashboard');
             } finally {
                 if (active) setLoading(false);
             }
         };
-
         loadDashboard();
-        return () => {
-            active = false;
-        };
+        return () => { active = false; };
     }, []);
 
     const stats = useMemo(() => {
         if (!data) return [];
         return [
-            { label: 'Total Konten', value: String(data.summary.totalContent), change: `${data.summary.publishedContent} publikasi`, icon: <FileText className="h-5 w-5" /> },
-            { label: 'Total Galeri', value: String(data.summary.galleryCount), change: `${data.summary.newsCount} berita`, icon: <Image className="h-5 w-5" /> },
-            { label: 'Pendaftar PPDB', value: String(data.summary.ppdbTotal), change: `${data.summary.ppdbAccepted} diterima`, icon: <Users className="h-5 w-5" /> },
-            { label: 'Gelombang Aktif', value: data.summary.activeWave?.name || 'Tidak ada', change: `${data.summary.subscribersCount} subscriber`, icon: <LayoutGrid className="h-5 w-5" /> },
+            { label: 'Konten Publik', value: String(data.summary.totalContent), desc: `${data.summary.publishedContent} Published`, icon: <FileText size={24} />, color: 'emerald' },
+            { label: 'Dokumentasi', value: String(data.summary.galleryCount), desc: `${data.summary.achievementCount} Prestasi`, icon: <Trophy size={24} />, color: 'blue' },
+            { label: 'Pendaftar Baru', value: String(data.summary.ppdbTotal), desc: `${data.summary.ppdbAccepted} Diterima`, icon: <Users size={24} />, color: 'indigo' },
+            { label: 'Subscribers', value: String(data.summary.subscribersCount), desc: 'Newsletter Active', icon: <Bell size={24} />, color: 'purple' },
         ];
     }, [data]);
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#080B09] text-gray-900 dark:text-gray-100 transition-colors duration-300">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80">
-                <section className="flex flex-col gap-6">
-                    <div className="flex flex-col gap-4 rounded-3xl border border-emerald-900/10 bg-white/80 p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                                <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">Dashboard</p>
-                                <h1 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">Selamat Datang, {adminName}</h1>
-                                <p className="mt-2 text-sm text-gray-500 dark:text-gray-300">
-                                    Ringkasan data real dari konten, PPDB, dan status sistem.
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-700/20 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
-                                    <Calendar className="h-4 w-4" />
-                                    {formatDateOnly(new Date().toISOString())}
-                                </div>
-                                <button
-                                    onClick={() => location.reload()}
-                                    className="rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition hover:text-emerald-600 dark:border-white/10 dark:bg-white/10 dark:text-emerald-200"
-                                    title="Muat ulang data"
-                                >
-                                    <Bell className="h-5 w-5" />
-                                </button>
-                            </div>
-                        </div>
+            
+            <main className="min-h-screen lg:pl-64 pb-20">
+                <HeaderAdmin 
+                    title={`Halo, ${adminName}`}
+                    subtitle="Monitor perkembangan madrasah dan atur konten dalam satu dashboard premium."
+                />
 
+                <section className="px-4 sm:px-8 mt-8 space-y-8">
+                    {error && (
+                        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                            {error}
+                        </div>
+                    )}
+                    {/* Stats Highlights */}
+                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
                         {loading ? (
-                            <div className="flex items-center gap-3 text-sm text-emerald-700 dark:text-emerald-300">
-                                <Loader2 className="h-5 w-5 animate-spin" />
-                                Memuat statistik dashboard...
-                            </div>
-                        ) : error ? (
-                            <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
-                        ) : (
-                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                {stats.map((stat) => (
-                                    <div
-                                        key={stat.label}
-                                        className="rounded-2xl border border-emerald-900/10 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-white/10 dark:bg-gray-900"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
-                                                {stat.icon}
-                                            </div>
-                                            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-300">{stat.change}</span>
-                                        </div>
-                                        <p className="mt-4 text-2xl font-bold">{stat.value}</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
+                            [...Array(4)].map((_, i) => (
+                                <div key={i} className="h-44 rounded-[2.5rem] bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 animate-pulse shadow-xl shadow-gray-200/50 dark:shadow-none" />
+                            ))
+                        ) : stats.map((stat) => (
+                            <div
+                                key={stat.label}
+                                className="group relative overflow-hidden rounded-[2.5rem] bg-white dark:bg-white/5 border border-white dark:border-white/10 p-8 shadow-2xl shadow-gray-200/50 dark:shadow-none transition-all duration-500 hover:-translate-y-2"
+                            >
+                                {(() => {
+                                    const style = STAT_STYLES[(stat.color as keyof typeof STAT_STYLES) || 'emerald'];
+                                    return (
+                                        <>
+                                <div className="flex items-start justify-between relative z-10">
+                                    <div className={`p-4 rounded-2xl transition-all duration-500 shadow-lg ${style.icon}`}>
+                                        {stat.icon}
                                     </div>
-                                ))}
+                                    <span className={`text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-4 duration-500 ${style.label}`}>
+                                        Detail <ChevronRight size={10} className="inline" />
+                                    </span>
+                                </div>
+                                <div className="mt-6 relative z-10">
+                                    <div className="flex items-baseline gap-2">
+                                        <h3 className="text-4xl font-black text-gray-950 dark:text-white tracking-tighter group-hover:translate-x-1 transition-transform duration-500">{stat.value}</h3>
+                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                    </div>
+                                    <p className="text-xs font-black text-gray-400 dark:text-gray-500 mt-1 uppercase tracking-[0.2em]">{stat.label}</p>
+                                    <p className={`mt-3 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full inline-block ${style.desc}`}>
+                                        {stat.desc}
+                                    </p>
+                                </div>
+                                <div className={`absolute -right-8 -bottom-8 h-32 w-32 rounded-full blur-3xl transition-all duration-700 group-hover:scale-150 ${style.glow}`} />
+                                        </>
+                                    );
+                                })()}
                             </div>
-                        )}
+                        ))}
                     </div>
 
-                    <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-                        <div className="rounded-3xl border border-emerald-900/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">Aktivitas</p>
-                                    <h2 className="mt-2 text-xl font-bold text-gray-900 dark:text-white">Aktivitas Terbaru</h2>
-                                </div>
-                            </div>
-                            <div className="mt-6 space-y-4">
-                                {!loading && !error && (data?.latestActivities || []).length === 0 && (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada aktivitas terbaru.</p>
-                                )}
-                                {(data?.latestActivities || []).map((activity) => (
-                                    <Link
-                                        key={activity.id}
-                                        href={activity.href}
-                                        className="flex items-start gap-4 rounded-2xl border border-emerald-900/10 bg-emerald-50/60 p-4 transition hover:bg-emerald-100/60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-                                    >
-                                        <div className={`mt-1 h-2 w-2 rounded-full ${activity.category === 'ppdb' ? 'bg-blue-500' : 'bg-emerald-600'}`}></div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{formatDateTime(activity.happenedAt)}</p>
-                                            <p className="truncate text-sm text-gray-800 dark:text-gray-200">{activity.title}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{activity.subtitle}</p>
+                    <div className="grid gap-8 lg:grid-cols-12 items-start">
+                        {/* Latest Activities */}
+                        <div className="lg:col-span-8 space-y-8">
+                            <div className="bg-white/70 dark:bg-white/5 backdrop-blur-3xl rounded-[3rem] border border-white dark:border-white/10 shadow-2xl shadow-gray-200/50 dark:shadow-none overflow-hidden">
+                                <div className="p-8 border-b border-gray-50 dark:border-white/5 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl text-indigo-600">
+                                            <Activity size={20} />
                                         </div>
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="rounded-3xl border border-emerald-900/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">Quick Actions</p>
-                                    <h2 className="mt-2 text-xl font-bold text-gray-900 dark:text-white">Tindakan Cepat</h2>
-                                </div>
-                                <ArrowUpRight className="h-5 w-5 text-emerald-600" />
-                            </div>
-                            <div className="mt-6 grid gap-3">
-                                {QUICK_ACTIONS.map((action) => (
-                                    <Link
-                                        key={action.label}
-                                        href={action.href}
-                                        className="flex items-center justify-between rounded-2xl border border-emerald-900/10 bg-emerald-50/70 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-white/10 dark:bg-white/5 dark:text-emerald-200"
-                                    >
-                                        <span className="flex items-center gap-3">
-                                            {action.icon}
-                                            {action.label}
-                                        </span>
-                                        <ArrowUpRight className="h-4 w-4" />
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-                        <div className="rounded-3xl border border-emerald-900/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">Konten Populer</p>
-                                    <h2 className="mt-2 text-xl font-bold text-gray-900 dark:text-white">Berita Paling Dibaca</h2>
-                                </div>
-                            </div>
-                            <div className="mt-6 space-y-4">
-                                {!loading && !error && (data?.topNews || []).length === 0 && (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada data view berita.</p>
-                                )}
-                                {(data?.topNews || []).map((item) => (
-                                    <Link
-                                        key={item.id}
-                                        href={item.href}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-900/10 bg-white p-4 shadow-sm transition hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-                                    >
                                         <div>
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.title}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(item.publishedAt)}</p>
+                                            <h2 className="text-lg font-black text-gray-950 dark:text-white uppercase tracking-tight">Timeline Aktivitas</h2>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Update real-time operasional sekolah</p>
                                         </div>
-                                        <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{item.viewCount.toLocaleString('id-ID')} views</div>
-                                    </Link>
-                                ))}
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            const loadDashboard = async () => {
+                                                setLoading(true);
+                                                setError(null);
+                                                try {
+                                                    const res = await fetch('/api/admin/dashboard', { cache: 'no-store' });
+                                                    const json = await res.json();
+                                                    if (!res.ok) throw new Error(json.error || 'Gagal memuat dashboard');
+                                                    setData(json as DashboardResponse);
+                                                } catch (err) {
+                                                    setError(err instanceof Error ? err.message : 'Gagal memuat dashboard');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            };
+                                            loadDashboard();
+                                        }}
+                                        className="p-2.5 bg-gray-50 dark:bg-white/5 text-gray-400 hover:text-emerald-600 rounded-xl transition-all"
+                                    >
+                                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                                    </button>
+                                </div>
+                                
+                                <div className="p-8 space-y-6">
+                                    {loading ? (
+                                        [...Array(5)].map((_, i) => (
+                                            <div key={i} className="h-20 w-full bg-gray-100/50 dark:bg-white/5 rounded-2xl animate-pulse" />
+                                        ))
+                                    ) : (data?.latestActivities || []).length === 0 ? (
+                                        <div className="text-center py-20 bg-gray-50/20 dark:bg-white/[0.02] rounded-[2rem] border border-dashed border-gray-100 dark:border-white/10">
+                                            <Clock size={40} className="mx-auto text-gray-200 mb-4" />
+                                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Belum ada catatan aktivitas baru</p>
+                                        </div>
+                                    ) : (data?.latestActivities || []).map((activity) => (
+                                        <Link
+                                            key={activity.id}
+                                            href={activity.href}
+                                            className="group flex items-center gap-6 p-5 rounded-[2rem] bg-white dark:bg-white/[0.02] border border-transparent hover:border-emerald-500/20 hover:bg-emerald-50/30 dark:hover:bg-emerald-500/[0.02] transition-all"
+                                        >
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg transition-transform group-hover:rotate-6 ${activity.category === 'ppdb' ? 'bg-indigo-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                                {activity.category === 'ppdb' ? <Users size={20} /> : <FileText size={20} />}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{formatDateTime(activity.happenedAt)}</span>
+                                                    <span className="w-1 h-1 rounded-full bg-gray-200"></span>
+                                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{activity.category}</span>
+                                                </div>
+                                                <p className="text-sm font-black text-gray-950 dark:text-white uppercase tracking-tight group-hover:text-emerald-600 transition-colors">{activity.title}</p>
+                                                <p className="text-xs text-gray-500 font-medium italic mt-0.5">{activity.subtitle}</p>
+                                            </div>
+                                            <ChevronRight size={20} className="text-gray-200 group-hover:text-emerald-600 transition-colors" />
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Top News */}
+                            <div className="bg-white/70 dark:bg-white/5 backdrop-blur-3xl rounded-[3rem] border border-white dark:border-white/10 shadow-2xl p-8">
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="p-3 bg-orange-50 dark:bg-orange-500/10 rounded-2xl text-orange-600">
+                                        <TrendingUp size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-black text-gray-950 dark:text-white uppercase tracking-tight">Tren Berita Utama</h2>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Konten paling populer dalam 30 hari terakhir</p>
+                                    </div>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-4">
+                                    {(data?.topNews || []).map((item) => (
+                                        <Link
+                                            key={item.id}
+                                            href={item.href}
+                                            className="group p-6 rounded-[2rem] bg-gray-50/50 dark:bg-white/[0.02] border border-transparent hover:border-orange-500/20 hover:bg-orange-500/[0.02] transition-all"
+                                        >
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="bg-orange-100 dark:bg-orange-500/20 text-orange-600 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase">
+                                                    {item.viewCount.toLocaleString()} VIEWS
+                                                </div>
+                                                <ArrowUpRight size={16} className="text-orange-500 opacity-0 group-hover:opacity-100 transition-all" />
+                                            </div>
+                                            <p className="text-sm font-black text-gray-950 dark:text-white uppercase tracking-tight line-clamp-2 leading-snug">{item.title}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">{formatDateTime(item.publishedAt)}</p>
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="rounded-3xl border border-emerald-900/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">Sistem</p>
-                                    <h2 className="mt-2 text-xl font-bold text-gray-900 dark:text-white">Status Sistem</h2>
+                        {/* Quick Actions & System Status */}
+                        <div className="lg:col-span-4 space-y-8">
+                            <div className="bg-white/70 dark:bg-white/5 backdrop-blur-3xl rounded-[3rem] border border-white dark:border-white/10 shadow-2xl p-8">
+                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.3em] mb-8 ml-2">Quick Commands</h3>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {QUICK_ACTIONS.map((action) => (
+                                        <Link
+                                            key={action.label}
+                                            href={action.href}
+                                            className="group flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-white/5 hover:bg-emerald-600 hover:text-white transition-all duration-500 shadow-sm shadow-gray-200/30 dark:shadow-none"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 text-emerald-600 shadow-lg group-hover:bg-white group-hover:text-emerald-600 group-hover:rotate-12 transition-all">
+                                                    {action.icon}
+                                                </div>
+                                                <span className="text-xs font-black uppercase tracking-widest">{action.label}</span>
+                                            </div>
+                                            <Zap size={14} className="opacity-0 group-hover:opacity-100 group-hover:animate-pulse transition-opacity" />
+                                        </Link>
+                                    ))}
                                 </div>
-                                <ShieldCheck className="h-5 w-5 text-emerald-600" />
                             </div>
-                            <div className="mt-6 space-y-3">
-                                <div className="flex items-center justify-between rounded-2xl border border-emerald-900/10 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 dark:border-white/10 dark:bg-white/5 dark:text-emerald-200">
-                                    API Dashboard
-                                    <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                        {data?.system.apiStatus === 'online' ? 'Online' : 'Offline'}
-                                    </span>
+
+                            <div className="bg-emerald-950 rounded-[3rem] border border-emerald-800 shadow-2xl p-10 relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-4 mb-8">
+                                        <div className="p-3 bg-emerald-500/20 rounded-2xl text-emerald-400">
+                                            <ShieldCheck size={24} />
+                                        </div>
+                                        <h3 className="text-lg font-black text-white uppercase tracking-tight">System State</h3>
+                                    </div>
+                                    
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center group cursor-help">
+                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] group-hover:text-emerald-400 transition-colors">Core API</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-black text-white uppercase">{data?.system.apiStatus || 'CHECKING'}</span>
+                                                <div className={`h-2 w-2 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] ${data?.system.apiStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center group cursor-help">
+                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] group-hover:text-emerald-400 transition-colors">Database</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-black text-white uppercase">{data?.system.databaseConfigured ? 'CONNECTED' : 'STANDBY'}</span>
+                                                <div className={`h-2 w-2 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] ${data?.system.databaseConfigured ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center group cursor-help">
+                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] group-hover:text-emerald-400 transition-colors">Push Engine</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-black text-white uppercase">{data?.system.pushConfigured ? 'READY' : 'OFF'}</span>
+                                                <div className={`h-2 w-2 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] ${data?.system.pushConfigured ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-10 p-5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md">
+                                        <p className="text-[8px] font-black text-emerald-600 uppercase tracking-[0.3em] mb-1">Generated Snapshot</p>
+                                        <p className="text-[10px] font-black text-white uppercase">{formatDateTime(data?.generatedAt)}</p>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-between rounded-2xl border border-emerald-900/10 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 dark:border-white/10 dark:bg-white/5 dark:text-emerald-200">
-                                    Konfigurasi Database
-                                    <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                        {data?.system.databaseConfigured ? 'Aktif' : 'Belum lengkap'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between rounded-2xl border border-emerald-900/10 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 dark:border-white/10 dark:bg-white/5 dark:text-emerald-200">
-                                    Push Notification
-                                    <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                        {data?.system.pushConfigured ? 'VAPID siap' : 'VAPID belum diset'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between rounded-2xl border border-emerald-900/10 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 dark:border-white/10 dark:bg-white/5 dark:text-emerald-200">
-                                    Snapshot data terakhir
-                                    <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                        {formatDateTime(data?.generatedAt)}
-                                    </span>
-                                </div>
+                                <div className="absolute -right-20 -top-20 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full" />
+                                <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full" />
                             </div>
                         </div>
                     </div>

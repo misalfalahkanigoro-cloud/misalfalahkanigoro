@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Upload, Trash2, File, AlertCircle } from 'lucide-react';
-import { CldUploadWidget } from '@/components/r2-upload-widget';
+import { StorageUploadWidget } from '@/components/r2-upload-widget';
 import SidebarAdmin from '@/components/sidebar-admin';
-import { api } from '@/lib/api';
+import { api, adminApi } from '@/lib/api';
 import type { Download } from '@/lib/types';
 
 const AdminDownloadEditPage: React.FC = () => {
@@ -20,7 +20,7 @@ const AdminDownloadEditPage: React.FC = () => {
         description: '',
         fileUrl: '',
         coverUrl: '',
-        isPublished: true,
+        is_published: true,
         downloadCount: 0,
     });
 
@@ -33,7 +33,7 @@ const AdminDownloadEditPage: React.FC = () => {
         if (!isNew && id) {
             const fetchData = async () => {
                 try {
-                    const res = await api.getDownloadDetail(id);
+                    const res = await adminApi.getDownloadDetail(id);
                     if (res) {
                         setForm(res);
                     }
@@ -55,9 +55,9 @@ const AdminDownloadEditPage: React.FC = () => {
         setSaving(true);
         try {
             if (isNew) {
-                await api.createDownload(form as any);
+                await adminApi.createDownload(form as any);
             } else {
-                await api.updateDownload(id, form as any);
+                await adminApi.updateDownload(id, form as any);
             }
             router.push('/admin/download');
             router.refresh();
@@ -119,7 +119,7 @@ const AdminDownloadEditPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80 space-y-8">
+            <main className="min-h-screen px-6 py-10 lg:pl-64 space-y-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-4">
@@ -209,8 +209,8 @@ const AdminDownloadEditPage: React.FC = () => {
                                 <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition">
                                     <input
                                         type="checkbox"
-                                        checked={form.isPublished}
-                                        onChange={e => setForm({ ...form, isPublished: e.target.checked })}
+                                        checked={form.is_published}
+                                        onChange={e => setForm({ ...form, is_published: e.target.checked })}
                                         className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
                                     />
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Publikasikan</span>
@@ -227,7 +227,7 @@ const AdminDownloadEditPage: React.FC = () => {
                                         )}
                                     </div>
                                     {canUpload ? (
-                                        <CldUploadWidget
+                                        <StorageUploadWidget
                                             options={{ folder: 'mis-al-falah/downloads/cover' }}
                                             onSuccess={handleCoverUpload}
                                         >
@@ -240,7 +240,7 @@ const AdminDownloadEditPage: React.FC = () => {
                                                     <Upload size={14} /> Upload
                                                 </button>
                                             )}
-                                        </CldUploadWidget>
+                                        </StorageUploadWidget>
                                     ) : (
                                         <button
                                             type="button"

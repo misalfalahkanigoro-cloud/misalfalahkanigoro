@@ -1,149 +1,105 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { groupMediaByEntity, mapMediaItem } from '@/lib/content-media';
+
+const mapDownload = (
+    row: Record<string, any>,
+    mediaRows: Array<Record<string, any>> = [],
+    files: Array<Record<string, any>> = []
+) => {
+    const media = mediaRows.map(mapMediaItem);
+    const cover = media.find((item) => item.isMain) || media[0];
+
+    return {
+        id: row.id,
+        title: row.title,
+        slug: row.slug,
+        description: row.description,
+        fileUrl: row.file_url,
+        fileStorageProvider: row.file_storage_provider,
+        fileStorageBucket: row.file_storage_bucket,
+        fileStoragePath: row.file_storage_path,
+        fileSizeKb: row.file_size_kb,
+        fileType: row.file_type,
+        downloadCount: row.download_count,
+        isPublished: Boolean(row.is_published),
+        isPinned: Boolean(row.is_pinned),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        coverUrl: cover ? cover.mediaUrl : null,
+        media,
+        files: files.map((file) => ({
+            id: file.id,
+            downloadId: file.download_id,
+            fileName: file.file_name,
+            fileType: file.file_type,
+            fileSizeKb: file.file_size_kb,
+            storageProvider: file.storage_provider,
+            storageBucket: file.storage_bucket,
+            storagePath: file.storage_path,
+            publicUrl: file.public_url,
+            displayOrder: file.display_order,
+            createdAt: file.created_at,
+        })),
+    };
+};
 
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
+        const isAdminRequest = Boolean(requireAdminRole(request.cookies, ['admin', 'superadmin']));
         const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
         const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') || '20', 10)));
 
-        const from = (page - 1) * pageSize;
-        const to = from + pageSize - 1;
+        const skip = (page - 1) * pageSize;
+        const where = !isAdminRequest ? { is_published: true } : undefined;
 
-        let query = dbAdmin()
-            .from('downloads')
-            .select('*, files:download_files(*)', { count: 'exact' })
-            .order('created_at', { ascending: false })
-            .range(from, to);
+        const [rows, total] = await Promise.all([
+            prisma.downloads.findMany({
+                where,
+                orderBy: [{ created_at: 'desc' }],
+                skip,
+                take: pageSize,
+                include: {
+                    download_files: {
+                        orderBy: [{ display_order: 'asc' }],
+                    },
+                },
+            }),
+            prisma.downloads.count({ where }),
+        ]);
 
-        const { data, count, error } = await query;
+        const ids = rows.map((row) => row.id);
+        const mediaRows = ids.length
+            ? await prisma.media_items.findMany({
+                where: {
+                    entity_type: 'download',
+                    entity_id: { in: ids },
+                },
+                orderBy: [{ display_order: 'asc' }],
+            })
+            : [];
 
-        if (error) throw error;
-
-        const ids = (data || []).map((row: any) => row.id);
-        let mediaByEntity: Record<string, any[]> = {};
-        if (ids.length) {
-            const { data: mediaData, error: mediaErr } = await dbAdmin()
-                .from('media_items')
-                .select('*')
-                .eq('entity_type', 'download')
-                .in('entity_id', ids)
-                .order('display_order', { ascending: true });
-            if (mediaErr) throw mediaErr;
-            mediaByEntity = (mediaData || []).reduce((acc: any, m: any) => {
-                (acc[m.entity_id] = acc[m.entity_id] || []).push(m);
-                return acc;
-            }, {});
-        }
-
-        const items = (data || []).map((row: any) => {
-            const media = mediaByEntity[row.id] || [];
-            const cover = media.find((m: any) => m.is_main) || media[0];
-            return {
-                id: row.id,
-                title: row.title,
-                slug: row.slug,
-                description: row.description,
-                fileUrl: row.file_url, // legacy single file
-                fileStorageProvider: row.file_storage_provider,
-                fileStorageBucket: row.file_storage_bucket,
-                fileStoragePath: row.file_storage_path,
-                fileSizeKb: row.file_size_kb,
-                fileType: row.file_type,
-            downloadCount: row.download_count,
-            isPublished: row.is_published,
-            isPinned: row.is_pinned,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-                coverUrl: cover ? cover.media_url : null,
-                media: media.map((m: any) => ({
-                    id: m.id,
-                    mediaUrl: m.media_url,
-                    mediaType: m.media_type,
-                    storageProvider: m.storage_provider,
-                    storageBucket: m.storage_bucket,
-                    storagePath: m.storage_path,
-                    thumbnailUrl: m.thumbnail_url,
-                    caption: m.caption,
-                    isMain: m.is_main,
-                    displayOrder: m.display_order,
-                    createdAt: m.created_at,
-                    entityType: m.entity_type,
-                    entityId: m.entity_id
-                })),
-                files: (row.files || []).map((f: any) => ({
-                    id: f.id,
-                    downloadId: f.download_id,
-                    fileName: f.file_name,
-                    fileType: f.file_type,
-                    fileSizeKb: f.file_size_kb,
-                    storageProvider: f.storage_provider,
-                    storageBucket: f.storage_bucket,
-                    storagePath: f.storage_path,
-                    publicUrl: f.public_url,
-                    displayOrder: f.display_order,
-                    createdAt: f.created_at
-                }))
-            };
-        });
+        const mediaByEntity = groupMediaByEntity(mediaRows as unknown as Array<Record<string, any>>);
+        const items = rows.map((row) =>
+            mapDownload(
+                row as unknown as Record<string, any>,
+                mediaByEntity[row.id] || [],
+                (row.download_files || []) as unknown as Array<Record<string, any>>
+            )
+        );
 
         return NextResponse.json({
             items,
-            total: count || 0,
+            total,
             page,
-            pageSize
+            pageSize,
         });
-
     } catch (error) {
         console.error('API Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
 
-        const dbPayload = {
-            title: body.title,
-            slug: body.slug,
-            description: body.description,
-            file_storage_provider: body.fileStorageProvider,
-            file_storage_bucket: body.fileStorageBucket,
-            file_storage_path: body.fileStoragePath,
-            file_url: body.fileUrl,
-            file_size_kb: body.fileSizeKb,
-            file_type: body.fileType,
-            download_count: 0,
-            is_published: body.isPublished,
-            is_pinned: body.isPinned ?? false
-        };
-
-        const { data, error } = await dbAdmin()
-            .from('downloads')
-            .insert(dbPayload)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        if (body.coverUrl && data?.id) {
-            await dbAdmin()
-                .from('media_items')
-                .insert({
-                    entity_id: data.id,
-                    entity_type: 'download',
-                    media_type: 'image',
-                    media_url: body.coverUrl,
-                    is_main: true,
-                    display_order: 0
-                });
-        }
-
-        return NextResponse.json(data);
-
-    } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-}

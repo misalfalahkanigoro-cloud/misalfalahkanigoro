@@ -1,170 +1,201 @@
-'use client';
-
-import React, { useEffect, useMemo, useState } from 'react';
-import { Camera, Music, PenTool, Activity, Loader2, Tent, BookMarked, Paintbrush, Trophy, Sunrise, Heart, BookOpen, SmilePlus } from 'lucide-react';
-import { api } from '@/lib/api';
+import React from 'react';
+import { Music, PenTool, Activity, Tent, BookMarked, Paintbrush, Trophy, Sunrise, Heart, BookOpen, SmilePlus, Zap, Users, Star } from 'lucide-react';
+import prisma from '@/lib/prisma';
 import type { Activity as ActivityItem, CharacterProgram, Extracurricular } from '@/lib/types';
+import { Playfair_Display, Plus_Jakarta_Sans } from 'next/font/google';
 
-// Helper component for icon
-const ZapIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-zap"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>;
+const headingFont = Playfair_Display({
+    subsets: ['latin'],
+    weight: ['500', '600', '700'],
+});
+
+const bodyFont = Plus_Jakarta_Sans({
+    subsets: ['latin'],
+    weight: ['400', '500', '600', '700'],
+});
 
 const iconMap: Record<string, React.ReactNode> = {
-    Activity: <Activity size={20} />,
-    Music: <Music size={20} />,
-    PenTool: <PenTool size={20} />,
-    Tent: <Tent size={20} />,
-    BookMarked: <BookMarked size={20} />,
-    Paintbrush: <Paintbrush size={20} />,
-    Trophy: <Trophy size={20} />,
-    Sunrise: <Sunrise size={20} />,
-    Heart: <Heart size={20} />,
-    BookOpen: <BookOpen size={20} />,
-    SmilePlus: <SmilePlus size={20} />,
-    Zap: <ZapIcon />,
+    Activity: <Activity size={24} />,
+    Music: <Music size={24} />,
+    PenTool: <PenTool size={24} />,
+    Tent: <Tent size={24} />,
+    BookMarked: <BookMarked size={24} />,
+    Paintbrush: <Paintbrush size={24} />,
+    Trophy: <Trophy size={24} />,
+    Sunrise: <Sunrise size={24} />,
+    Heart: <Heart size={24} />,
+    BookOpen: <BookOpen size={24} />,
+    SmilePlus: <SmilePlus size={24} />,
+    Zap: <Zap size={24} />,
 };
 
-const Kesiswaan: React.FC = () => {
-    const [activities, setActivities] = useState<ActivityItem[]>([]);
-    const [extracurriculars, setExtracurriculars] = useState<Extracurricular[]>([]);
-    const [characterPrograms, setCharacterPrograms] = useState<CharacterProgram[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchActivities = async () => {
-            try {
-                const [activitiesData, extracurricularsData, characterProgramsData] = await Promise.all([
-                    api.getActivities(),
-                    api.getExtracurriculars(),
-                    api.getCharacterPrograms(),
-                ]);
-                setActivities(activitiesData as ActivityItem[]);
-                setExtracurriculars(extracurricularsData as Extracurricular[]);
-                setCharacterPrograms(characterProgramsData as CharacterProgram[]);
-            } catch (error) {
-                console.error('Error fetching activities:', error);
-            } finally {
-                setLoading(false);
-            }
+async function getData() {
+    try {
+        const [activities, extracurriculars, characterPrograms] = await Promise.all([
+            prisma.activities.findMany({ orderBy: { createdAt: 'desc' }, take: 8 }),
+            prisma.extracurriculars.findMany({ where: { isactive: true }, orderBy: { displayorder: 'asc' } }),
+            prisma.character_programs.findMany({ where: { isactive: true }, orderBy: { displayorder: 'asc' } }),
+        ]);
+        return {
+            activities: activities as any as ActivityItem[],
+            extracurriculars: extracurriculars as any as Extracurricular[],
+            characterPrograms: characterPrograms as any as CharacterProgram[],
         };
+    } catch (error) {
+        console.error('Error fetching kesiswaan data on server:', error);
+        return { activities: [], extracurriculars: [], characterPrograms: [] };
+    }
+}
 
-        fetchActivities();
-    }, []);
-
-    const fallbackExtracurriculars: Extracurricular[] = [
-        { id: 'fallback-1', name: 'Pramuka', description: 'Melatih kepemimpinan dan kemandirian siswa', icon: 'Tent', displayOrder: 1, isActive: true },
-        { id: 'fallback-2', name: 'Drum Band', description: 'Ekspresi seni musik dan kekompakan tim', icon: 'Music', displayOrder: 2, isActive: true },
-        { id: 'fallback-3', name: 'Pencak Silat', description: 'Membangun fisik dan mental yang tangguh', icon: 'Activity', displayOrder: 3, isActive: true },
-        { id: 'fallback-4', name: 'Kaligrafi', description: 'Mengasah kreativitas seni kaligrafi Arab', icon: 'PenTool', displayOrder: 4, isActive: true },
-    ];
-
-    const fallbackCharacterPrograms: CharacterProgram[] = [
-        { id: 'cp-1', name: '5S (Senyum, Salam, Sapa, Sopan, Santun)', description: 'Pembiasaan karakter di gerbang madrasah setiap pagi.', icon: 'SmilePlus', frequency: 'Setiap Hari', displayOrder: 1, isActive: true },
-        { id: 'cp-2', name: 'Sholat Dhuha & Dzuhur', description: 'Dilakukan berjamaah untuk melatih kedisiplinan ibadah.', icon: 'Sunrise', frequency: 'Setiap Hari', displayOrder: 2, isActive: true },
-        { id: 'cp-3', name: 'Murajaah Pagi', description: 'Membaca surat pendek dan Asmaul Husna sebelum KBM dimulai.', icon: 'BookOpen', frequency: 'Setiap Hari', displayOrder: 3, isActive: true },
-    ];
-
-    const extracurricularView = useMemo(
-        () => (extracurriculars.length ? extracurriculars : fallbackExtracurriculars),
-        [extracurriculars]
-    );
-
-    const characterProgramView = useMemo(
-        () => (characterPrograms.length ? characterPrograms : fallbackCharacterPrograms),
-        [characterPrograms]
-    );
+const KesiswaanPage = async () => {
+    const { activities, extracurriculars, characterPrograms } = await getData();
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16 transition-colors duration-200">
-            <section className="bg-gradient-to-r from-emerald-50 via-white to-emerald-50 dark:from-[#0B0F0C] dark:via-[#0F1511] dark:to-[#0B0F0C] border-b border-emerald-100/70 dark:border-white/10">
-                <div className="container mx-auto px-4 py-8 md:py-10">
-                    <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-emerald-700/70 dark:text-emerald-200/70">
-                        <span className="h-[2px] w-8 bg-emerald-500/70"></span>
-                        Halaman
+        <div className={`${bodyFont.className} min-h-screen bg-gray-50 dark:bg-[#0A0D0B] text-gray-900 dark:text-gray-100 transition-colors duration-300`}>
+            {/* Header Section */}
+            <section className="relative overflow-hidden bg-emerald-950 pt-20 pb-40">
+                <div className="absolute inset-0 opacity-20">
+                    <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_20%,_#10b981_0%,_transparent_40%)]"></div>
+                </div>
+                <div className="container mx-auto px-4 relative z-10 text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-[0.4em] mb-8">
+                        <Users size={12} className="mb-0.5" />
+                        PENGEMBANGAN DIRI
                     </div>
-                    <h1 className="mt-3 text-2xl md:text-4xl font-bold text-emerald-950 dark:text-white">Kesiswaan</h1>
+                    <h1 className={`${headingFont.className} text-4xl md:text-7xl text-white font-black tracking-tight leading-tight mb-8`}>
+                        Ekosistem <span className="text-emerald-400">Kesiswaan</span>
+                    </h1>
+                    <p className="max-w-2xl mx-auto text-emerald-100/60 text-lg md:text-xl font-medium leading-relaxed">
+                        Membangun potensi, mengasah kreativitas, dan membentuk karakter yang kokoh melalui beragam kegiatan inspiratif.
+                    </p>
                 </div>
             </section>
-            <div className="container mx-auto px-4 py-12 space-y-16">
-                {/* Ekstrakurikuler */}
-                <section>
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="h-8 w-1 bg-primary rounded-full"></div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ekstrakurikuler</h2>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {extracurricularView.map((ekskul) => (
-                            <div
-                                key={ekskul.id}
-                                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-start gap-3 hover:border-primary dark:hover:border-green-500 transition"
-                            >
-                                <div className="text-primary dark:text-green-400 bg-green-50 dark:bg-green-900/30 p-2 rounded-full mt-1">
-                                    {ekskul.icon && iconMap[ekskul.icon] ? iconMap[ekskul.icon] : <Activity size={20} />}
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-gray-800 dark:text-gray-100">{ekskul.name}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ekskul.description}</p>
-                                    {ekskul.schedule && (
-                                        <p className="text-[11px] text-emerald-600 dark:text-emerald-300 mt-2">{ekskul.schedule}</p>
-                                    )}
-                                    {ekskul.coachName && (
-                                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Pembina: {ekskul.coachName}</p>
-                                    )}
-                                </div>
+            <main className="container mx-auto px-4">
+                {/* Pembiasaan Karakter */}
+                <section className="-mt-20 relative z-20 mb-20">
+                    <div className="bg-white dark:bg-gray-900 rounded-[3rem] p-10 md:p-16 shadow-2xl shadow-emerald-900/10 dark:shadow-black/50 border border-emerald-100 dark:border-white/5 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-12 opacity-5">
+                            <Heart size={200} />
+                        </div>
+                        <div className="text-center mb-16 relative z-10">
+                            <h2 className="text-2xl md:text-4xl font-black tracking-tight mb-4">Pembiasaan Karakter</h2>
+                            <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto font-medium">Nilai-nilai luhur yang ditanamkan melalui rutinitas harian santri MIS Al-Falah.</p>
+                        </div>
+                        
+                        {characterPrograms.length === 0 ? (
+                            <div className="text-center py-10 opacity-60">
+                                <p className="italic">Data pembiasaan sedang diperbarui.</p>
                             </div>
-                        ))}
-                    </div>
-                </section>
-
-                {/* Pembiasaan Harian */}
-                <section className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-md transition-colors">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">Pembiasaan Karakter</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {characterProgramView.map((program) => (
-                            <div key={program.id} className="text-center">
-                                <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-300">
-                                    {program.icon && iconMap[program.icon] ? iconMap[program.icon] : <Heart size={20} />}
-                                </div>
-                                <h3 className="font-bold text-lg mb-2 dark:text-gray-100">{program.name}</h3>
-                                <p className="text-gray-500 dark:text-gray-400 text-sm">{program.description}</p>
-                                {program.frequency && (
-                                    <p className="text-xs text-emerald-600 dark:text-emerald-300 mt-2">{program.frequency}</p>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                {/* Gallery */}
-                <section>
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="h-8 w-1 bg-primary rounded-full"></div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Galeri Kegiatan</h2>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {loading && (
-                            <div className="col-span-full flex items-center justify-center py-10">
-                                <Loader2 className="animate-spin text-primary" size={32} />
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
+                                {characterPrograms.map((program) => (
+                                    <div key={program.id} className="group p-8 rounded-[2rem] bg-emerald-50/50 dark:bg-white/5 hover:bg-emerald-600 transition-all duration-500 hover:-translate-y-2">
+                                        <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm mb-6 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-500">
+                                            {program.icon && iconMap[program.icon] ? iconMap[program.icon] : <Star size={24} />}
+                                        </div>
+                                        <h3 className="text-xl font-black mb-3 group-hover:text-white transition-colors tracking-tight">{program.name}</h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-emerald-50 transition-colors leading-relaxed mb-6">
+                                            {program.description}
+                                        </p>
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-widest group-hover:bg-white/20 group-hover:text-white transition-colors">
+                                            <Sunrise size={10} />
+                                            {program.frequency || 'Harian'}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
-
-                        {!loading && activities.map((activity) => (
-                            <div key={activity.id} className="group relative overflow-hidden rounded-lg aspect-square bg-gray-200 dark:bg-gray-700">
-                                <img
-                                    src={activity.imageUrl || 'https://picsum.photos/600/400'}
-                                    alt={activity.title}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                                    <span className="text-white font-medium">{activity.title}</span>
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </section>
-            </div>
+
+                {/* Ekstrakurikuler */}
+                <section className="mb-24">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                        <div className="max-w-xl">
+                            <div className="flex items-center gap-3 text-emerald-600 font-bold text-[10px] uppercase tracking-[0.4em] mb-4">
+                                <span className="h-[2px] w-12 bg-emerald-500"></span>
+                                EXTRA CURRICULAR
+                            </div>
+                            <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">Wadah Minat dan Bakat</h2>
+                        </div>
+                    </div>
+
+                    {extracurriculars.length === 0 ? (
+                        <div className="rounded-[3rem] border-2 border-dashed border-emerald-100 dark:border-white/5 p-20 text-center opacity-60">
+                            <p className="italic">Daftar ekstrakurikuler sedang disiapkan.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {extracurriculars.map((ekskul) => (
+                                <div key={ekskul.id} className="group relative bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-xl shadow-emerald-900/5 dark:shadow-black/20 border border-emerald-50 dark:border-white/5 transition-all hover:bg-emerald-950">
+                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-6 bg-emerald-50 dark:bg-white/5 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 transform group-hover:rotate-12">
+                                        {ekskul.icon && iconMap[ekskul.icon] ? iconMap[ekskul.icon] : <Activity size={24} />}
+                                    </div>
+                                    <h3 className="text-lg font-black mb-3 group-hover:text-white transition-colors">{ekskul.name}</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 group-hover:text-emerald-100/70 transition-colors leading-relaxed mb-6 line-clamp-2">
+                                        {ekskul.description}
+                                    </p>
+                                    <div className="space-y-2">
+                                        {ekskul.schedule && (
+                                            <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-300 uppercase tracking-widest">{ekskul.schedule}</p>
+                                        )}
+                                        {ekskul.coachName && (
+                                            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 group-hover:text-white/40 uppercase tracking-widest">PEMBINA: {ekskul.coachName}</p>
+                                        )}
+                                    </div>
+                                    <div className="absolute top-8 right-8 w-2 h-2 rounded-full bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                {/* Galeri Kegiatan */}
+                <section className="mb-24">
+                    <div className="text-center mb-16">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/5 border border-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-black uppercase tracking-[0.4em] mb-4">
+                            MOMENTS
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-black tracking-tight">Keseruan Siswa</h2>
+                    </div>
+
+                    {activities.length === 0 ? (
+                        <div className="text-center py-20 opacity-40 italic">
+                            Belum ada foto kegiatan baru.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                            {activities.map((activity, idx) => (
+                                <div 
+                                    key={activity.id} 
+                                    className={`group relative overflow-hidden rounded-[2rem] aspect-square bg-gray-200 dark:bg-gray-800 ${
+                                        idx === 0 || idx === 5 ? 'md:col-span-2 md:row-span-1 md:aspect-auto' : ''
+                                    }`}
+                                >
+                                    {activity.imageUrl ? (
+                                        <img
+                                            src={activity.imageUrl}
+                                            alt={activity.title}
+                                            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 group-hover:rotate-1"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-white/5">
+                                            <Activity className="text-gray-300 dark:text-white/10" size={48} />
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-end p-8">
+                                        <p className="text-white font-black tracking-tight text-lg mb-1 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">{activity.title}</p>
+                                        <p className="text-white/60 text-xs font-bold uppercase tracking-widest translate-y-4 group-hover:translate-y-0 transition-transform duration-500 delay-75">Documentation</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </main>
         </div>
     );
 };
 
-export default Kesiswaan;
+export default KesiswaanPage;

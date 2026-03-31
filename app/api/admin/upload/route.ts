@@ -1,90 +1,124 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
-
 export const runtime = 'nodejs';
 
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { buildStoragePath, deleteObjectsFromBucket, extractStorageIdentityFromUrl, getObjectMetadata, uploadObjectToBucket } from '@/lib/r2-storage';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { validateUploadPolicy } from '@/lib/upload-policy';
+import { logError } from '@/lib/logger';
+import { checkStorageQuota, updateStorageUsage } from '@/lib/storage-quota';
+
+const allowedEntityTypes = new Set([
+    'news',
+    'publication',
+    'achievement',
+    'gallery',
+    'download',
+    'academic',
+    'ppdb',
+]);
+const isUuid = (value: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
 export async function POST(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const formData = await request.formData();
-        const file = formData.get('file') as File;
-        const folder = (formData.get('folder') as string) || 'general';
-        const entityType = formData.get('entityType') as string | null;
-        const entityId = formData.get('entityId') as string | null;
-        const caption = (formData.get('caption') as string) || file?.name || '';
+        const file = formData.get('file') as File | null;
+        const folder = ((formData.get('folder') as string) || 'general').trim();
+        const entityType = (formData.get('entityType') as string) || null;
+        const entityId = (formData.get('entityId') as string) || null;
+        const caption = ((formData.get('caption') as string) || '').trim();
         const isMain = formData.get('isMain') === 'true';
+        const replaceUrl = formData.get('replaceUrl') as string | null;
 
         if (!file) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
         }
-
-        const normalizedFolder = folder.trim().replace(/^\/+|\/+$/g, '') || 'general';
-        const buffer = await file.arrayBuffer();
-        const fileExt = file.name.split('.').pop();
-        const originalName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fileName = `${normalizedFolder}/${Date.now()}-${crypto.randomUUID()}-${originalName || `upload.${fileExt || 'bin'}`}`;
-        const contentType = file.type || 'application/octet-stream';
-        const bucketName = 'media';
-        const storageProvider = 'r2';
-        const mediaType = file.type?.startsWith('image/') ? 'image' : 'file';
-
-        const { error: uploadError } = await dbAdmin()
-            .storage
-            .from(bucketName)
-            .upload(fileName, buffer, {
-                contentType,
-                upsert: false,
-            });
-
-        if (uploadError) {
-            console.error('Storage Upload Error:', uploadError);
-            throw uploadError;
+        const validation = validateUploadPolicy(file, 'publikweb');
+        if (!validation.ok) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
         }
 
-        const { data: { publicUrl } } = dbAdmin()
-            .storage
-            .from(bucketName)
-            .getPublicUrl(fileName);
+        // Quota check
+        const quotaCheck = await checkStorageQuota(file.size);
+        if (!quotaCheck.ok) {
+            return NextResponse.json({ error: quotaCheck.error }, { status: 403 });
+        }
+        if (entityType && !allowedEntityTypes.has(entityType)) {
+            return NextResponse.json({ error: 'entityType tidak valid.' }, { status: 400 });
+        }
+        if (entityId && !isUuid(entityId)) {
+            return NextResponse.json({ error: 'entityId tidak valid.' }, { status: 400 });
+        }
 
-        let mediaItem: any = null;
+        const safeName = (file.name || 'upload.bin').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const customPath = formData.get('path') as string | null;
+        const path = customPath ? customPath : buildStoragePath(folder || 'general', safeName);
+        const metadata = await uploadObjectToBucket({
+            bucket: 'publikweb',
+            path,
+            file,
+            contentType: file.type || 'application/octet-stream',
+        });
+
+        // Delete old file if provided
+        if (replaceUrl) {
+            try {
+                const identity = extractStorageIdentityFromUrl(replaceUrl);
+                if (identity && identity.path) {
+                    const oldMetadata = await getObjectMetadata(identity.bucket, identity.path);
+                    await deleteObjectsFromBucket(identity.bucket, [identity.path]);
+                    if (oldMetadata?.ContentLength) {
+                        await updateStorageUsage(-oldMetadata.ContentLength);
+                    }
+                }
+            } catch (err) {
+                logError('admin.upload.replaceUrlCleanup', err);
+            }
+        }
+
+        // Update database quota with new file size
+        await updateStorageUsage(metadata.sizeBytes);
+
+        let mediaItem: { id: string } | null = null;
         if (entityType && entityId) {
-            const { data: inserted, error: dbError } = await dbAdmin()
-                .from('media_items')
-                .insert({
+            const mediaType = file.type?.startsWith('video/') ? 'video' : 'image';
+            mediaItem = await prisma.media_items.create({
+                data: {
                     entity_type: entityType,
                     entity_id: entityId,
-                    storage_provider: storageProvider,
-                    storage_bucket: bucketName,
-                    storage_path: fileName,
-                    media_url: publicUrl,
                     media_type: mediaType,
-                    caption,
-                    thumbnail_url: mediaType === 'image' ? publicUrl : null,
+                    media_url: metadata.url,
+                    storage_provider: metadata.provider,
+                    storage_bucket: metadata.bucket,
+                    storage_path: metadata.path,
+                    thumbnail_url: mediaType === 'image' ? metadata.url : null,
+                    caption: caption || file.name || null,
                     is_main: isMain,
                     display_order: 0,
-                })
-                .select()
-                .single();
-
-            if (dbError) {
-                console.error('DB Insert Error:', dbError);
-                throw dbError;
-            }
-            mediaItem = inserted;
+                },
+                select: { id: true },
+            });
         }
 
         return NextResponse.json({
             id: mediaItem?.id ?? null,
-            url: publicUrl,
-            mediaUrl: publicUrl,
-            mediaType,
-            caption,
-            storageProvider,
-            storageBucket: bucketName,
-            storagePath: fileName,
+            url: metadata.url,
+            mediaUrl: metadata.url,
+            mediaType: file.type?.startsWith('video/') ? 'video' : 'image',
+            caption: caption || file.name || '',
+            storageProvider: metadata.provider,
+            storageBucket: metadata.bucket,
+            storagePath: metadata.path,
+            metadata,
         });
-
     } catch (error) {
-        console.error('Upload API Error:', error);
-        return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+        logError('admin.upload.POST', error);
+        return NextResponse.json({ error: 'Upload gagal.' }, { status: 500 });
     }
 }

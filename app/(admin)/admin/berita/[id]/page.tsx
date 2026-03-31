@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Trash2, Image as ImageIcon, Plus, X, Globe, User, Calendar } from 'lucide-react';
 import SidebarAdmin from '@/components/sidebar-admin';
 import TiptapEditor from '@/components/tiptap-editor';
-import { api } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 import type { NewsPost, MediaItem } from '@/lib/types';
 import MediaUploadButton from '@/components/admin/MediaUploadButton';
 import MediaManager, { MediaForm } from '@/components/admin/MediaManager';
@@ -23,7 +23,7 @@ const AdminNewsEditPage: React.FC = () => {
         content: '',
         authorName: 'Admin', // Default
         publishedAt: new Date().toISOString().split('T')[0],
-        isPublished: true,
+        is_published: true,
         isPinned: false,
         coverUrl: '',
         media: [],
@@ -36,27 +36,43 @@ const AdminNewsEditPage: React.FC = () => {
     const [mediaPreviewIndex, setMediaPreviewIndex] = useState(0);
     const [mediaMessage, setMediaMessage] = useState<string | null>(null);
 
+    const toDateInputValue = (value?: string | Date | null) => {
+        const date = value ? new Date(value) : new Date();
+        if (Number.isNaN(date.getTime())) {
+            return new Date().toISOString().split('T')[0];
+        }
+        return date.toISOString().split('T')[0];
+    };
+
+    const toIsoDateTime = (value?: string | Date | null) => {
+        const date = value ? new Date(value) : new Date();
+        if (Number.isNaN(date.getTime())) {
+            return new Date().toISOString();
+        }
+        return date.toISOString();
+    };
+
     useEffect(() => {
         if (!isNew && id) {
             const fetchData = async () => {
                 try {
-                    const res = await api.getNewsDetail(id);
+                    const res = await adminApi.getNewsDetail(id);
                     if (res) {
                         setForm({
                             ...res,
-                            publishedAt: new Date((res as NewsPost).publishedAt).toISOString().split('T')[0],
+                            publishedAt: toDateInputValue((res as NewsPost).publishedAt),
                         });
                         const mappedMedia = ((res as NewsPost).media || [])
                             .filter((m) => !m.isMain)
                             .map((m, idx) => ({
-                            id: m.id,
-                            mediaType: (m.mediaType as any) || 'image',
-                            url: m.mediaUrl || '',
-                            embedHtml: '',
-                            caption: m.caption || '',
-                            displayOrder: m.displayOrder || idx + 1,
-                            isActive: true,
-                        }));
+                                id: m.id,
+                                mediaType: (m.mediaType as any) || 'image',
+                                url: m.mediaUrl || '',
+                                embedHtml: '',
+                                caption: m.caption || '',
+                                displayOrder: m.displayOrder || idx + 1,
+                                isActive: true,
+                            }));
                         setMediaItems(mappedMedia);
                     }
                 } catch (error) {
@@ -71,8 +87,13 @@ const AdminNewsEditPage: React.FC = () => {
             // Try to get current user for author name
             const stored = localStorage.getItem('adminUser');
             if (stored) {
-                const user = JSON.parse(stored);
-                setForm(prev => ({ ...prev, authorName: user.fullName || user.username || 'Admin' }));
+                try {
+                    const user = JSON.parse(stored);
+                    setForm(prev => ({ ...prev, authorName: user.fullName || user.username || 'Admin' }));
+                } catch (error) {
+                    console.error('Failed to parse adminUser from localStorage:', error);
+                    localStorage.removeItem('adminUser');
+                }
             }
         }
     }, [id, isNew]);
@@ -98,14 +119,14 @@ const AdminNewsEditPage: React.FC = () => {
 
             const payload = {
                 ...form,
-                publishedAt: new Date(form.publishedAt!).toISOString(),
+                publishedAt: toIsoDateTime(form.publishedAt),
                 media: mediaPayload,
             };
 
             if (isNew) {
-                await api.createNews(payload);
+                await adminApi.createNews(payload);
             } else {
-                await api.updateNews(id, payload);
+                await adminApi.updateNews(id, payload);
             }
             router.push('/admin/berita');
             router.refresh();
@@ -153,7 +174,7 @@ const AdminNewsEditPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80 space-y-8">
+            <main className="min-h-screen px-6 py-10 lg:pl-64 space-y-8">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-4">
@@ -252,8 +273,8 @@ const AdminNewsEditPage: React.FC = () => {
                                     <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition">
                                         <input
                                             type="checkbox"
-                                            checked={form.isPublished}
-                                            onChange={e => setForm({ ...form, isPublished: e.target.checked })}
+                                            checked={form.is_published}
+                                            onChange={e => setForm({ ...form, is_published: e.target.checked })}
                                             className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
                                         />
                                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Publikasikan</span>
@@ -322,7 +343,7 @@ const AdminNewsEditPage: React.FC = () => {
                                 )}
 
                                 <MediaUploadButton
-                                    folder="mis-al-falah/news"
+                                    folder="mi-mh-02/news"
                                     label={uploading ? 'Uploading...' : 'Upload Cover'}
                                     onUploaded={handleCoverUpload}
                                     className={uploading ? 'opacity-50 cursor-not-allowed' : ''}
@@ -340,7 +361,7 @@ const AdminNewsEditPage: React.FC = () => {
                                                     className="h-8 w-8 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 dark:border-white/10 dark:text-gray-300"
                                                     title="Sebelumnya"
                                                 >
-                                                    â€¹
+                                                    {'<'}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -348,7 +369,7 @@ const AdminNewsEditPage: React.FC = () => {
                                                     className="h-8 w-8 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 dark:border-white/10 dark:text-gray-300"
                                                     title="Selanjutnya"
                                                 >
-                                                    â€º
+                                                    {'>'}
                                                 </button>
                                             </div>
                                         </div>

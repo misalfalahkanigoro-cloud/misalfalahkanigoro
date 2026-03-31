@@ -249,7 +249,7 @@ async function resetSequences(targetClient: Client) {
 }
 
 async function main() {
-    const sourceUrl = process.env.SOURCE_DATABASE_URL || process.env.SUPABASE_SOURCE_DATABASE_URL;
+    const sourceUrl = process.env.SOURCE_DATABASE_URL;
     const targetUrl = process.env.DATABASE_URL;
 
     if (!sourceUrl) {
@@ -306,6 +306,29 @@ async function main() {
         }
 
         await resetSequences(targetClient);
+
+        // --- Upsert identitas sekolah ---
+        const schoolName = 'MI Miftahul Huda 02 Papungan';
+        const schoolAddress = 'Papungan, Blitar';
+
+        await targetClient.query(`
+            INSERT INTO school_settings (id, name, address, phone, email)
+            VALUES ('main', $1, $2, '', '')
+            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+        `, [schoolName, schoolAddress]);
+
+        await targetClient.query(`
+            INSERT INTO site_settings (id, school_name, school_address)
+            VALUES (gen_random_uuid(), $1, $2)
+            ON CONFLICT DO NOTHING
+        `, [schoolName, schoolAddress]);
+
+        // Update existing site_settings rows yang sudah ada
+        await targetClient.query(`
+            UPDATE site_settings SET school_name = $1 WHERE TRUE
+        `, [schoolName]);
+
+        console.log('Identitas sekolah diperbarui: ' + schoolName);
         console.log('Seed selesai: data source database berhasil disalin ke Neon.');
     } finally {
         await sourceClient.end();

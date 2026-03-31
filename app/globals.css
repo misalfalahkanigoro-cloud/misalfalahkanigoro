@@ -99,3 +99,12 @@ article {
 .animate-bounce-subtle {
   animation: bounce-subtle 2s infinite ease-in-out;
 }
+
+@media (min-width: 1024px) {
+  body.sidebar-collapsed main {
+    padding-left: 0 !important;
+  }
+  body main {
+    transition: padding-left 0.3s ease-in-out;
+  }
+}

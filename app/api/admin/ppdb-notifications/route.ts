@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
 import { sendPushNotification } from '@/lib/push';
 
 export async function GET() {
     try {
-        const { data, error } = await dbAdmin()
-            .from('ppdb_notifications')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const rows = await prisma.ppdb_notifications.findMany({
+            orderBy: [{ created_at: 'desc' }],
+        });
 
-        if (error) throw error;
-        return NextResponse.json(data || []);
+        return NextResponse.json(rows);
     } catch (error) {
         console.error('Admin PPDB notifications error:', error);
         return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
@@ -31,50 +29,47 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Title and message are required' }, { status: 400 });
         }
 
-        const { data, error } = await dbAdmin()
-            .from('ppdb_notifications')
-            .insert({
+        const created = await prisma.ppdb_notifications.create({
+            data: {
                 title: payload.title,
                 message: payload.message,
                 registration_id: registrationId,
                 wave_id: waveId,
-            })
-            .select('*')
-            .single();
+            },
+        });
 
-        if (error) throw error;
-
-        // Build targets
         let registrationIds: string[] = [];
 
         if (registrationId) {
             registrationIds = [registrationId];
         } else if (waveId) {
-            const { data: regs, error: regError } = await dbAdmin()
-                .from('ppdb_registrations')
-                .select('id')
-                .eq('wave_id', waveId);
-            if (regError) throw regError;
-            registrationIds = (regs || []).map((r: any) => r.id);
+            const registrations = await prisma.ppdb_registrations.findMany({
+                where: { wave_id: waveId },
+                select: { id: true },
+            });
+            registrationIds = registrations.map((registration) => registration.id);
         }
 
-        if (registrationIds.length) {
-            const { data: subs, error: subsError } = await dbAdmin()
-                .from('push_subscriptions')
-                .select('endpoint, p256dh, auth')
-                .in('registration_id', registrationIds);
-
-            if (subsError) throw subsError;
+        if (registrationIds.length > 0) {
+            const subscriptions = await prisma.push_subscriptions.findMany({
+                where: {
+                    registration_id: { in: registrationIds },
+                },
+                select: {
+                    endpoint: true,
+                    p256dh: true,
+                    auth: true,
+                },
+            });
 
             let targetUrl = '/ppdb';
             if (registrationId) {
-                const { data: reg } = await dbAdmin()
-                    .from('ppdb_registrations')
-                    .select('nisn')
-                    .eq('id', registrationId)
-                    .maybeSingle();
-                if (reg?.nisn) {
-                    targetUrl = `/ppdb/sukses?nisn=${reg.nisn}`;
+                const registration = await prisma.ppdb_registrations.findUnique({
+                    where: { id: registrationId },
+                    select: { nisn: true },
+                });
+                if (registration?.nisn) {
+                    targetUrl = `/ppdb/sukses?nisn=${registration.nisn}`;
                 }
             }
 
@@ -84,16 +79,16 @@ export async function POST(request: NextRequest) {
                 data: { url: targetUrl },
             };
 
-            for (const sub of subs || []) {
+            for (const subscription of subscriptions) {
                 try {
-                    await sendPushNotification(sub as any, pushPayload);
-                } catch (err) {
-                    console.error('Failed to send push notification:', err);
+                    await sendPushNotification(subscription as any, pushPayload);
+                } catch (pushError) {
+                    console.error('Failed to send push notification:', pushError);
                 }
             }
         }
 
-        return NextResponse.json(data);
+        return NextResponse.json(created);
     } catch (error) {
         console.error('Admin PPDB notification create error:', error);
         return NextResponse.json({ error: 'Failed to create notification' }, { status: 500 });

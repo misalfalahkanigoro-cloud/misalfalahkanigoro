@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/db';
 import { requireAdminRole } from '@/lib/admin-auth';
+import { getObjectMetadata } from '@/lib/r2-storage';
+import { updateStorageUsage, syncStorageUsageWithR2 } from '@/lib/storage-quota';
+import prisma from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
@@ -88,6 +91,19 @@ async function collectUsage(bucket: string) {
 
     await traverse('');
 
+    // Update database sync
+    try {
+        const settings = await prisma.site_settings.findFirst({ select: { id: true } });
+        if (settings) {
+            await (prisma.site_settings as any).update({
+                where: { id: settings.id },
+                data: { storage_used_bytes: totalBytes }
+            });
+        }
+    } catch (err) {
+        console.error('Failed to sync storage usage to DB:', err);
+    }
+
     return {
         totalBytes,
         totalFiles,
@@ -95,8 +111,9 @@ async function collectUsage(bucket: string) {
     };
 }
 
-async function collectFilePaths(bucket: string, prefix: string) {
-    const files: string[] = [];
+
+async function collectFilesWithSizes(bucket: string, prefix: string) {
+    const files: Array<{ path: string, size: number }> = [];
 
     const traverse = async (currentPrefix: string) => {
         let offset = 0;
@@ -115,7 +132,10 @@ async function collectFilePaths(bucket: string, prefix: string) {
 
             for (const item of data as StorageItem[]) {
                 if (item.id) {
-                    files.push(joinPath(currentPrefix, item.name));
+                    files.push({
+                        path: joinPath(currentPrefix, item.name),
+                        size: item.metadata?.size ?? 0
+                    });
                 } else {
                     const nextPrefix = joinPath(currentPrefix, item.name);
                     await traverse(nextPrefix);
@@ -162,12 +182,19 @@ export async function GET(request: NextRequest) {
 
         const usage = includeUsage ? await collectUsage(bucket) : null;
 
+        // Fetch current DB estimate
+        const settings = await (prisma.site_settings as any).findFirst();
+        const dbTotalBytes = Number(settings?.storage_used_bytes || 0);
+
         return NextResponse.json({
             bucket,
             prefix,
             items,
             nextOffset,
             usage,
+            dbUsage: {
+                totalBytes: dbTotalBytes
+            }
         });
     } catch (error) {
         console.error('Storage list error:', error);
@@ -198,25 +225,34 @@ export async function DELETE(request: NextRequest) {
         }
 
         if (isFolder) {
-            const files = await collectFilePaths(bucket, path);
+            const files = await collectFilesWithSizes(bucket, path);
             if (files.length === 0) {
                 return NextResponse.json({ success: true, deleted: 0 });
             }
 
             const chunkSize = 100;
             let deleted = 0;
+            let totalDeletedSize = 0;
             for (let i = 0; i < files.length; i += chunkSize) {
                 const chunk = files.slice(i, i + chunkSize);
-                const { error } = await dbAdmin().storage.from(bucket).remove(chunk);
+                const paths = chunk.map(f => f.path);
+                const { error } = await dbAdmin().storage.from(bucket).remove(paths);
                 if (error) throw error;
                 deleted += chunk.length;
+                totalDeletedSize += chunk.reduce((acc, f) => acc + f.size, 0);
             }
 
+            await updateStorageUsage(-totalDeletedSize);
             return NextResponse.json({ success: true, deleted });
         }
 
+        const metadata = await getObjectMetadata(bucket, path);
         const { error } = await dbAdmin().storage.from(bucket).remove([path]);
         if (error) throw error;
+
+        if (metadata?.ContentLength) {
+            await updateStorageUsage(-metadata.ContentLength);
+        }
 
         return NextResponse.json({ success: true, deleted: 1 });
     } catch (error) {

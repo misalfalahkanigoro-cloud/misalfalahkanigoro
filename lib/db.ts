@@ -1,13 +1,9 @@
 import {
-    deleteFromSupabaseStorage as legacyDeleteFromStorage,
-    supabase as legacyDb,
-    supabaseAdmin as legacyDbAdmin,
-    supabaseClient as legacyDbClient,
-    uploadToSupabaseStorage as legacyUploadToStorage,
+    db as coreDb,
+    dbAdmin as coreDbAdmin,
+    dbClient as coreDbClient,
 } from '@/lib/db-core';
 
-export const dbClient = legacyDbClient;
-export const db = legacyDb;
-export const dbAdmin = legacyDbAdmin;
-export const uploadToStorage = legacyUploadToStorage;
-export const deleteFromStorage = legacyDeleteFromStorage;
+export const dbClient = coreDbClient;
+export const db = coreDb;
+export const dbAdmin = coreDbAdmin;

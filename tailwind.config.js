@@ -11,6 +11,9 @@ module.exports = {
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],
             },
+            spacing: {
+                '4.5': '1.125rem',
+            },
             colors: {
                 primary: '#1E7F43', // Hijau Tua Islami
                 secondary: '#166033', // Hijau Lebih Tua untuk Hover
@@ -19,5 +22,7 @@ module.exports = {
             },
         },
     },
-    plugins: [],
+    plugins: [
+        require('@tailwindcss/typography'),
+    ],
 }

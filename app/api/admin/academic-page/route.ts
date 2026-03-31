@@ -1,61 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { buildMediaPayload, mapMediaItem } from '@/lib/content-media';
+import { sanitizePlainText } from '@/lib/rich-text';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
-        const { data: page, error: pageError } = await dbAdmin()
-            .from('academic_pages')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-        if (pageError) throw pageError;
+        const page = await prisma.academic_pages.findFirst({
+            orderBy: { created_at: 'desc' },
+            include: {
+                academic_sections: {
+                    orderBy: [{ display_order: 'asc' }, { created_at: 'asc' }],
+                },
+            },
+        });
 
         if (!page) {
             return NextResponse.json({ page: null, sections: [], media: [] });
         }
 
-        const { data: sections, error: sectionsError } = await dbAdmin()
-            .from('academic_sections')
-            .select('*')
-            .eq('page_id', page.id)
-            .order('display_order', { ascending: true });
+        const mediaItems = await prisma.media_items.findMany({
+            where: {
+                entity_type: 'academic',
+                entity_id: page.id,
+            },
+            orderBy: [{ is_main: 'desc' }, { display_order: 'asc' }],
+        });
 
-        if (sectionsError) throw sectionsError;
-
-        const { data: mediaItems, error: mediaError } = await dbAdmin()
-            .from('media_items')
-            .select('*')
-            .eq('entity_type', 'academic')
-            .eq('entity_id', page.id)
-            .order('is_main', { ascending: false })
-            .order('display_order', { ascending: true });
-
-        if (mediaError) throw mediaError;
-
-        const mappedSections = (sections || []).map((item: any) => ({
-            id: item.id,
-            pageId: item.page_id,
-            title: item.title,
-            body: item.body,
-            displayOrder: item.display_order,
-            createdAt: item.created_at,
-            updatedAt: item.updated_at,
-        }));
-
-        const mappedMedia = (mediaItems || []).map((item: any) => ({
-            id: item.id,
-            entityType: item.entity_type,
-            entityId: item.entity_id,
-            mediaType: item.media_type,
-            mediaUrl: item.media_url,
-            thumbnailUrl: item.thumbnail_url,
-            caption: item.caption,
-            isMain: item.is_main,
-            displayOrder: item.display_order,
-            createdAt: item.created_at,
-        }));
+        const mappedMedia = mediaItems.map((item) => mapMediaItem(item as unknown as Record<string, any>));
 
         return NextResponse.json({
             page: {
@@ -67,9 +44,17 @@ export async function GET() {
                 createdAt: page.created_at,
                 updatedAt: page.updated_at,
             },
-            sections: mappedSections,
+            sections: page.academic_sections.map((item) => ({
+                id: item.id,
+                pageId: item.page_id,
+                title: item.title,
+                body: item.body,
+                displayOrder: item.display_order,
+                createdAt: item.created_at,
+                updatedAt: item.updated_at,
+            })),
             media: mappedMedia,
-            coverUrl: mappedMedia.find((m: any) => m.isMain)?.mediaUrl || null,
+            coverUrl: mappedMedia.find((item) => item.isMain)?.mediaUrl || null,
         });
     } catch (error) {
         console.error('Admin academic page error:', error);
@@ -78,6 +63,11 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const payload = await request.json();
         const page = payload.page || payload;
@@ -85,99 +75,78 @@ export async function PUT(request: NextRequest) {
         const media = Array.isArray(payload.media) ? payload.media : [];
         const coverUrl = payload.coverUrl || page.coverUrl || null;
 
-        const pagePayload = {
-            title: page.title || '',
-            subtitle: page.subtitle || null,
-            content: page.content || null,
-            is_active: page.isActive ?? true,
-        } as any;
+        const savedPage = await prisma.$transaction(async (tx) => {
+            const pagePayload = {
+                title: sanitizePlainText(page.title, 160) ?? '',
+                subtitle: sanitizePlainText(page.subtitle, 220),
+                content: sanitizePlainText(page.content, 5000),
+                is_active: page.isActive ?? true,
+            };
 
-        let savedPage: any;
+            const persistedPage = page.id
+                ? await tx.academic_pages.upsert({
+                      where: { id: page.id },
+                      update: pagePayload,
+                      create: { id: page.id, ...pagePayload },
+                  })
+                : await tx.academic_pages.create({
+                      data: pagePayload,
+                  });
 
-        if (page.id) {
-            const { data, error } = await dbAdmin()
-                .from('academic_pages')
-                .upsert({ id: page.id, ...pagePayload })
-                .select('*')
-                .single();
-            if (error) throw error;
-            savedPage = data;
-        } else {
-            const { data, error } = await dbAdmin()
-                .from('academic_pages')
-                .insert(pagePayload)
-                .select('*')
-                .single();
-            if (error) throw error;
-            savedPage = data;
-        }
+            const keptSectionIds: string[] = [];
 
-        const { error: deleteSectionsError } = await dbAdmin()
-            .from('academic_sections')
-            .delete()
-            .eq('page_id', savedPage.id);
-        if (deleteSectionsError) throw deleteSectionsError;
+            for (const [index, item] of sections.entries()) {
+                const sectionPayload = {
+                    page_id: persistedPage.id,
+                    title: sanitizePlainText(item.title, 160) ?? '',
+                    body: sanitizePlainText(item.body, 4000),
+                    display_order: Number(item.displayOrder ?? index + 1) || index + 1,
+                };
 
-        if (sections.length) {
-            const sectionPayload = sections
-                .map((item: any, index: number) => ({
-                    page_id: savedPage.id,
-                    title: item.title?.trim() || '',
-                    body: item.body?.trim() || null,
-                    display_order: Number(item.displayOrder) || index + 1,
-                }))
-                .filter((item: any) => item.title);
+                if (!sectionPayload.title) continue;
 
-            if (sectionPayload.length) {
-                const { error } = await dbAdmin()
-                    .from('academic_sections')
-                    .insert(sectionPayload);
-                if (error) throw error;
+                if (item.id) {
+                    const savedSection = await tx.academic_sections.upsert({
+                        where: { id: item.id },
+                        update: sectionPayload,
+                        create: { id: item.id, ...sectionPayload },
+                    });
+                    keptSectionIds.push(savedSection.id);
+                } else {
+                    const savedSection = await tx.academic_sections.create({
+                        data: sectionPayload,
+                    });
+                    keptSectionIds.push(savedSection.id);
+                }
             }
-        }
 
-        const { error: deleteMediaError } = await dbAdmin()
-            .from('media_items')
-            .delete()
-            .eq('entity_type', 'academic')
-            .eq('entity_id', savedPage.id);
-        if (deleteMediaError) throw deleteMediaError;
+            await tx.academic_sections.deleteMany({
+                where: {
+                    page_id: persistedPage.id,
+                    ...(keptSectionIds.length ? { id: { notIn: keptSectionIds } } : {}),
+                },
+            });
 
-        if (coverUrl) {
-            const { error } = await dbAdmin()
-                .from('media_items')
-                .insert({
-                    entity_id: savedPage.id,
+            await tx.media_items.deleteMany({
+                where: {
                     entity_type: 'academic',
-                    media_type: 'image',
-                    media_url: coverUrl,
-                    is_main: true,
-                    display_order: 0,
-                });
-            if (error) throw error;
-        }
+                    entity_id: persistedPage.id,
+                },
+            });
 
-        if (media.length) {
-            const mediaPayload = media
-                .map((item: any, index: number) => ({
-                    entity_id: savedPage.id,
-                    entity_type: 'academic',
-                    media_type: item.mediaType || 'image',
-                    media_url: item.mediaUrl || item.url || item.embedHtml,
-                    thumbnail_url: item.thumbnailUrl || null,
-                    caption: item.caption || null,
-                    is_main: false,
-                    display_order: item.displayOrder ?? index + 1,
-                }))
-                .filter((item: any) => item.media_url);
+            const mediaRows = buildMediaPayload({
+                entityId: persistedPage.id,
+                entityType: 'academic',
+                mediaInput: media,
+                coverUrlInput: coverUrl,
+            });
 
-            if (mediaPayload.length) {
-                const { error } = await dbAdmin()
-                    .from('media_items')
-                    .insert(mediaPayload);
-                if (error) throw error;
+            if (mediaRows.length > 0) {
+                await tx.media_items.createMany({ data: mediaRows });
             }
-        }
+
+            return persistedPage;
+        });
 
         return NextResponse.json({
             page: {

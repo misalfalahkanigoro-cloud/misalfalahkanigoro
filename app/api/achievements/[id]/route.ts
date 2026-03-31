@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/db';
+import { requireAdminRole } from '@/lib/admin-auth';
 
 const mapAchievement = (row: any, media: any[] = []) => {
     const mappedMedia = media.map((m: any) => ({
@@ -39,6 +40,7 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
+        const isAdminRequest = Boolean(requireAdminRole(request.cookies, ['admin', 'superadmin']));
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
         let query = dbAdmin()
@@ -49,6 +51,9 @@ export async function GET(
             query = query.eq('id', id);
         } else {
             query = query.eq('slug', id);
+        }
+        if (!isAdminRequest) {
+            query = query.eq('is_published', true);
         }
 
         const { data, error } = await query.maybeSingle();
@@ -68,122 +73,6 @@ export async function GET(
 
         return NextResponse.json(mapAchievement(data, mediaData || []));
 
-    } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-}
-
-export async function PUT(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const body = await request.json();
-        const { id } = await params;
-
-        const dbPayload = {
-            title: body.title,
-            slug: body.slug,
-            event_name: body.eventName,
-            event_level: body.eventLevel,
-            rank: body.rank,
-            description: body.description,
-            achieved_at: body.achievedAt,
-            is_published: body.isPublished,
-            is_pinned: body.isPinned,
-            updated_at: new Date().toISOString()
-        };
-
-        const { data, error } = await dbAdmin()
-            .from('achievements')
-            .update(dbPayload)
-            .eq('id', id)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        if (body.media && Array.isArray(body.media)) {
-            await dbAdmin()
-                .from('media_items')
-                .delete()
-                .eq('entity_id', id)
-                .eq('entity_type', 'achievement')
-                .eq('is_main', false);
-
-            const normalized = body.media
-                .filter((m: any) => m.mediaUrl)
-                .map((m: any, idx: number) => ({
-                    entity_id: id,
-                    entity_type: 'achievement',
-                    media_type: m.mediaType || 'image',
-                    media_url: m.mediaUrl,
-                    thumbnail_url: m.thumbnailUrl || null,
-                    caption: m.caption || null,
-                    is_main: Boolean(m.isMain),
-                    display_order: m.displayOrder ?? idx + 1,
-                }));
-
-            if (normalized.length) {
-                await dbAdmin().from('media_items').insert(normalized);
-            }
-        }
-
-        if (body.coverUrl) {
-            await dbAdmin()
-                .from('media_items')
-                .delete()
-                .eq('entity_id', id)
-                .eq('entity_type', 'achievement')
-                .eq('is_main', true);
-
-            await dbAdmin()
-                .from('media_items')
-                .insert({
-                    entity_id: id,
-                    entity_type: 'achievement',
-                    media_type: 'image',
-                    media_url: body.coverUrl,
-                    is_main: true,
-                    display_order: 0
-                });
-        }
-
-        const { data: mediaData, error: mediaError } = await dbAdmin()
-            .from('media_items')
-            .select('*')
-            .eq('entity_type', 'achievement')
-            .eq('entity_id', id)
-            .order('display_order', { ascending: true });
-
-        if (mediaError) throw mediaError;
-
-        return NextResponse.json(mapAchievement(data, mediaData || []));
-
-    } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-}
-
-export async function DELETE(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params;
-        // Cleanup media first
-        await dbAdmin().from('media_items').delete().eq('entity_id', id);
-
-        const { error } = await dbAdmin()
-            .from('achievements')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-
-        return NextResponse.json({ success: true });
 
     } catch (error) {
         console.error('API Error:', error);

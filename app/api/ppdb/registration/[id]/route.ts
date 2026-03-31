@@ -1,39 +1,33 @@
-import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { mapPpdbFile } from '@/lib/ppdb-mapper';
+import { requireAdminRole } from '@/lib/admin-auth';
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { id } = await params;
-        const { data: registration, error } = await dbAdmin()
-            .from('ppdb_registrations')
-            .select('*')
-            .eq('id', id)
-            .maybeSingle();
 
-        if (error) throw error;
+        const registration = await prisma.ppdb_registrations.findUnique({
+            where: { id },
+        });
+
         if (!registration) {
             return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
         }
 
-        const { data: files, error: filesError } = await dbAdmin()
-            .from('ppdb_files')
-            .select('*')
-            .eq('registration_id', id)
-            .order('created_at', { ascending: true });
-
-        if (filesError) throw filesError;
-
-        const mappedFiles = (files || []).map((file: any) => ({
-            id: file.id,
-            registrationId: file.registration_id,
-            fileType: file.file_type,
-            fileUrl: file.file_url,
-            createdAt: file.created_at,
-        }));
+        const files = await prisma.ppdb_files.findMany({
+            where: { registration_id: id },
+            orderBy: [{ created_at: 'asc' }],
+        });
 
         return NextResponse.json({
             ...registration,
-            files: mappedFiles,
+            files: files.map((file) => mapPpdbFile(file as unknown as Record<string, any>)),
         });
     } catch (error) {
         console.error('Error fetching PPDB registration:', error);

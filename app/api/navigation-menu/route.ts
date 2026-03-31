@@ -2,19 +2,13 @@ import { NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/db';
 import type { NavigationMenuItem } from '@/lib/types';
 
+import { getCachedNavigationMenu } from '@/lib/cache-service';
+
 export async function GET() {
     try {
-        const { data, error } = await dbAdmin()
-            .from('navigation_menu')
-            .select('*')
-            .eq('is_active', true)
-            .order('display_order', { ascending: true });
+        const data = await getCachedNavigationMenu();
 
-        if (error) {
-            throw error;
-        }
-
-        const items: NavigationMenuItem[] = (data || []).map((row: any) => ({
+        const roots: NavigationMenuItem[] = data.map((row: any) => ({
             id: row.id,
             label: row.label,
             href: row.href,
@@ -22,32 +16,22 @@ export async function GET() {
             displayOrder: row.display_order,
             isActive: row.is_active,
             icon: row.icon,
+            children: (row.other_navigation_menu || []).map((sub: any) => ({
+                id: sub.id,
+                label: sub.label,
+                href: sub.href,
+                parentId: sub.parent_id,
+                displayOrder: sub.display_order,
+                isActive: sub.is_active,
+                icon: sub.icon,
+            })),
         }));
 
-        const map = new Map<string, NavigationMenuItem>();
-        items.forEach((item) => map.set(item.id, { ...item, children: [] }));
-
-        const roots: NavigationMenuItem[] = [];
-        items.forEach((item) => {
-            const current = map.get(item.id)!;
-            if (item.parentId) {
-                const parent = map.get(item.parentId);
-                if (parent) {
-                    parent.children = parent.children || [];
-                    parent.children.push(current);
-                }
-            } else {
-                roots.push(current);
-            }
+        return NextResponse.json(roots, {
+            headers: {
+                'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=59',
+            },
         });
-
-        roots.forEach((root) => {
-            if (root.children) {
-                root.children.sort((a, b) => a.displayOrder - b.displayOrder);
-            }
-        });
-
-        return NextResponse.json(roots.sort((a, b) => a.displayOrder - b.displayOrder));
     } catch (error) {
         console.error('Error fetching navigation menu:', error);
         return NextResponse.json([]);

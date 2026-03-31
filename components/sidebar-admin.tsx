@@ -1,344 +1,171 @@
-﻿'use client';
+'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import {
-    LayoutDashboard,
-    Newspaper,
-    Users,
-    ClipboardList,
-    Settings,
-    Shield,
-    UserRound,
-    Menu,
-    Sun,
-    Moon,
-    LogOut,
-    LayoutPanelTop,
-    LayoutList,
-    ChevronDown,
-    ChevronUp,
-    BookOpen,
-    Landmark,
-    History,
-    Target,
-    MapPin,
-    Share2,
-    ImagePlus,
-    Sparkles,
-    PanelsTopLeft,
-    Download,
-    GraduationCap,
-    FileText,
-} from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Menu, Shield, X } from 'lucide-react';
+import { useTheme } from '@/lib/hooks/use-theme';
+import { useAdminAuth } from '@/lib/hooks/use-admin-auth';
+import { SIDEBAR_ITEMS, type SidebarItem } from '@/components/admin/sidebar-constants';
+import { AdminProfileSection } from './admin/sidebar/AdminProfileSection';
+import { LogoutButton } from './admin/sidebar/LogoutButton';
+import { NavLink } from './admin/sidebar/NavLink';
+import { NavGroup } from './admin/sidebar/NavGroup';
 
-type SidebarItem = {
-    label: string;
-    href?: string;
-    icon: React.ElementType;
-    children?: Array<{ label: string; href: string; icon?: React.ElementType }>;
-};
-
-const SIDEBAR_ITEMS: SidebarItem[] = [
-    { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    {
-        label: 'Profil',
-        icon: BookOpen,
-        children: [
-            { label: 'Sambutan KM', href: '/admin/sambutan', icon: Landmark },
-            { label: 'Profil', href: '/admin/profil-sekolah', icon: UserRound },
-            { label: 'Sejarah', href: '/admin/sejarah', icon: History },
-            { label: 'Visi Misi', href: '/admin/visi-misi', icon: Target },
-            { label: 'Kontak', href: '/admin/kontak', icon: MapPin },
-        ],
-    },
-    {
-        label: 'Akademik',
-        icon: BookOpen,
-        children: [
-            { label: 'Akademik', href: '/admin/akademik', icon: BookOpen },
-            { label: 'Kesiswaan', href: '/admin/kesiswaan', icon: Users },
-            { label: 'Guru', href: '/admin/guru', icon: Users },
-        ],
-    },
-    {
-        label: 'Informasi',
-        icon: FileText,
-        children: [
-            { label: 'Berita', href: '/admin/berita', icon: Newspaper },
-            { label: 'Publikasi', href: '/admin/publikasi', icon: Newspaper },
-            { label: 'Galeri', href: '/admin/galeri', icon: ImagePlus },
-            { label: 'Prestasi', href: '/admin/prestasi', icon: Newspaper },
-            { label: 'Kelulusan', href: '/admin/kelulusan', icon: GraduationCap },
-            { label: 'Download', href: '/admin/download', icon: Download },
-        ],
-    },
-    { label: 'PPDB', href: '/admin/ppdb', icon: ClipboardList },
-    { label: 'Kelola Header', href: '/admin/kelola-header', icon: LayoutPanelTop },
-    { label: 'Kelola Footer', href: '/admin/kelola-footer', icon: LayoutList },
-    { label: 'Sosial Media', href: '/admin/sosial-media', icon: Share2 },
-];
-
-type StoredAdminUser = {
-    id: string;
-    username: string;
-    role: 'admin' | 'superadmin' | string;
-    fullName?: string;
-};
+const SIDEBAR_WIDTH = 'w-[260px]';
 
 const SidebarAdmin: React.FC = () => {
-    const router = useRouter();
     const pathname = usePathname();
+    const { isDark, toggleTheme } = useTheme();
+    const { user, logout, displayName, displayRole } = useAdminAuth();
     const [open, setOpen] = useState(false);
-    const [isDark, setIsDark] = useState(false);
-    const [user, setUser] = useState<StoredAdminUser | null>(null);
     const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+    const [isDesktopOpen, setIsDesktopOpen] = useState(true);
 
+    // Close mobile sidebar on route change
     useEffect(() => {
-        const stored = localStorage.getItem('adminUser');
-        if (!stored) {
-            router.replace('/login');
-            return;
-        }
-        const parsed = JSON.parse(stored) as StoredAdminUser;
-        if (!['admin', 'superadmin'].includes(parsed.role)) {
-            router.replace('/login');
-            return;
-        }
-        setUser(parsed);
-    }, [router]);
+        setOpen(false);
+    }, [pathname]);
 
+    // Prevent body scroll when mobile sidebar is open
     useEffect(() => {
-        const syncTheme = () => {
-            const storedTheme = localStorage.getItem('theme');
-            if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                setIsDark(true);
-                document.documentElement.classList.add('dark');
-            } else {
-                setIsDark(false);
-                document.documentElement.classList.remove('dark');
-            }
-        };
-
-        syncTheme();
-        const media = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleMedia = () => syncTheme();
-        const handleStorage = (event: StorageEvent) => {
-            if (event.key === 'theme') {
-                syncTheme();
-            }
-        };
-
-        media.addEventListener('change', handleMedia);
-        window.addEventListener('storage', handleStorage);
-        return () => {
-            media.removeEventListener('change', handleMedia);
-            window.removeEventListener('storage', handleStorage);
-        };
-    }, []);
-
-    const toggleTheme = () => {
-        if (isDark) {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-            setIsDark(false);
+        if (open) {
+            document.body.style.overflow = 'hidden';
         } else {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-            setIsDark(true);
+            document.body.style.overflow = '';
         }
-    };
+        return () => { document.body.style.overflow = ''; };
+    }, [open]);
 
-    const handleLogout = async () => {
-        try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-        } catch {
-            // ignore logout failures
+    // Handle desktop sidebar collapse
+    useEffect(() => {
+        if (!isDesktopOpen) {
+            document.body.classList.add('sidebar-collapsed');
+        } else {
+            document.body.classList.remove('sidebar-collapsed');
         }
-        localStorage.removeItem('adminUser');
-        router.replace('/login');
-    };
-
-    const displayName = useMemo(() => {
-        if (!user) return 'ADMIN';
-        return (user.fullName || user.username || 'ADMIN').toUpperCase();
-    }, [user]);
-
-    const displayRole = useMemo(() => {
-        if (!user) return 'ADMIN';
-        return (user.role || 'admin').toString().toUpperCase();
-    }, [user]);
-
-    const showKontrolAkun = user?.role === 'superadmin';
-    const showFileManager = user?.role === 'superadmin';
+        return () => { document.body.classList.remove('sidebar-collapsed'); };
+    }, [isDesktopOpen]);
 
     const isGroupActive = (item: SidebarItem) =>
         item.children?.some((child) => child.href === pathname) ?? false;
 
     const SidebarContent = (
-        <div className="flex h-full flex-col gap-8 p-6 pb-8 overflow-y-auto admin-scrollbar bg-gradient-to-b from-white/95 to-white dark:from-[#0B0F0C] dark:to-[#0B0F0C]">
-            <div className="sticky top-0 z-20 -mx-1 flex flex-col items-stretch gap-3 rounded-2xl border border-emerald-900/10 bg-white/95 p-1 backdrop-blur dark:border-white/10 dark:bg-[#0B0F0C]/95">
-                <Link
-                    href="/admin/akunadmin"
-                    className="inline-flex items-center gap-3 rounded-2xl bg-emerald-600 px-3 py-2 text-white shadow-lg shadow-emerald-600/30"
-                >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white">
-                        <PanelsTopLeft size={20} />
-                    </div>
-                    <div className="leading-tight">
-                        <p className="text-[10px] uppercase tracking-[0.25em] opacity-80">{displayRole}</p>
-                        <p className="text-sm font-bold">{displayName}</p>
-                    </div>
-                </Link>
-                <button
-                    onClick={toggleTheme}
-                    aria-label="Toggle theme"
-                    aria-pressed={isDark}
-                    title={isDark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
-                    className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border px-2.5 pr-3 text-xs font-semibold shadow-sm transition ${isDark
-                        ? 'border-emerald-300/70 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-100'
-                        : 'border-emerald-900/10 bg-white text-emerald-700 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:bg-white/10 dark:text-white'
-                        }`}
-                >
-                    <span className={`flex h-6 w-6 items-center justify-center rounded-xl transition ${isDark
-                        ? 'bg-emerald-600 text-white shadow'
-                        : 'bg-emerald-100 text-emerald-700 dark:bg-white/15 dark:text-white'
-                        }`}>
-                        {isDark ? <Sun size={14} /> : <Moon size={14} />}
-                    </span>
-                    <span className="tracking-wide">{isDark ? 'TERANG' : 'GELAP'}</span>
-                </button>
-            </div>
+        <div className="flex w-full h-full flex-col gap-2 p-3 pb-6 overflow-y-auto admin-scrollbar bg-white dark:bg-[#0B0F0C]">
+            <AdminProfileSection
+                displayName={displayName}
+                displayRole={displayRole}
+                isDark={isDark}
+                toggleTheme={toggleTheme}
+            />
 
-            <nav className="flex-1 space-y-3">
+            <nav className="flex-1 space-y-0.5 px-1">
                 {SIDEBAR_ITEMS.map((item) => {
                     const active = item.href ? pathname === item.href : isGroupActive(item);
-                    const Icon = item.icon;
 
                     if (item.children?.length) {
                         const isOpen = openGroups[item.label] ?? active;
                         return (
-                            <div key={item.label} className="space-y-1">
-                                <button
-                                    onClick={() =>
-                                        setOpenGroups((prev) => ({
-                                            ...prev,
-                                            [item.label]: !isOpen,
-                                        }))
-                                    }
-                                    className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition ${active
-                                        ? 'bg-emerald-600/15 text-emerald-800 ring-1 ring-emerald-200 dark:bg-white/5 dark:text-white dark:ring-white/10'
-                                        : 'text-gray-700 hover:bg-emerald-50 hover:text-emerald-900 dark:text-emerald-100/80 dark:hover:bg-white/5 dark:hover:text-white'
-                                        }`}
-                                >
-                                    <span className="flex items-center gap-3">
-                                        <Icon size={18} />
-                                        {item.label}
-                                    </span>
-                                    {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                </button>
-                                {isOpen && (
-                                    <div className="space-y-1 pl-4">
-                                        {item.children.map((child) => {
-                                            const childActive = pathname === child.href;
-                                            const ChildIcon = child.icon;
-                                            return (
-                                                <Link
-                                                    key={child.href}
-                                                    href={child.href}
-                                                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition ${childActive
-                                                        ? 'bg-emerald-600/15 text-emerald-900 ring-1 ring-emerald-200 dark:text-white dark:ring-white/10'
-                                                        : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 dark:text-emerald-100/70 dark:hover:bg-white/5 dark:hover:text-white'
-                                                        }`}
-                                                >
-                                                    {ChildIcon ? <ChildIcon size={14} /> : null}
-                                                    {child.label}
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
+                            <NavGroup
+                                key={item.label}
+                                label={item.label}
+                                icon={item.icon}
+                                isActive={active}
+                                isOpen={isOpen}
+                                pathname={pathname}
+                                onToggle={() => setOpenGroups(prev => ({ ...prev, [item.label]: !isOpen }))}
+                                children={item.children as any}
+                            />
                         );
                     }
 
                     return (
-                        <Link
+                        <NavLink
                             key={item.href}
                             href={item.href as string}
-                            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${active
-                                ? 'bg-emerald-600/15 text-emerald-900 ring-1 ring-emerald-200 dark:text-white dark:ring-white/10'
-                                : 'text-gray-700 hover:bg-emerald-50 hover:text-emerald-900 dark:text-emerald-100/80 dark:hover:bg-white/5 dark:hover:text-white'
-                                }`}
-                        >
-                            <Icon size={18} />
-                            {item.label}
-                        </Link>
+                            label={item.label}
+                            icon={item.icon}
+                            isActive={active}
+                        />
                     );
                 })}
 
-                {showFileManager && (
-                    <Link
-                        href="/admin/pengaturan"
-                        className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname === '/admin/pengaturan'
-                            ? 'bg-emerald-600/15 text-emerald-900 ring-1 ring-emerald-200 dark:text-white dark:ring-white/10'
-                            : 'text-gray-700 hover:bg-emerald-50 hover:text-emerald-900 dark:text-emerald-100/80 dark:hover:bg-white/5 dark:hover:text-white'
-                            }`}
-                    >
-                        <Settings size={18} />
-                        File Manager
-                    </Link>
-                )}
-
-                {showKontrolAkun && (
+                {user?.role === 'superadmin' && (
                     <Link
                         href="/admin/kontrolAkun"
-                        className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${pathname === '/admin/kontrolAkun'
-                            ? 'bg-amber-300/30 text-amber-900 dark:text-white'
-                            : 'text-amber-700 hover:bg-amber-50 hover:text-amber-900 dark:text-amber-100/90 dark:hover:bg-white/5 dark:hover:text-white'
+                        className={`group flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-semibold transition-all duration-300 ${pathname === '/admin/kontrolAkun'
+                            ? 'bg-amber-50 text-amber-800 border-l-[3px] border-amber-500 dark:bg-amber-500/10 dark:text-amber-100'
+                            : 'text-amber-700 hover:bg-amber-50 hover:text-amber-900 dark:text-amber-400 dark:hover:bg-amber-500/5'
                             }`}
                     >
-                        <Shield size={18} />
+                        <Shield size={18} className={`transition-colors duration-200 ${pathname === '/admin/kontrolAkun' ? 'text-amber-600' : 'opacity-60'}`} />
                         Kontrol Akun
                     </Link>
                 )}
             </nav>
 
-            <div className="space-y-3">
-                <button
-                    onClick={handleLogout}
-                    className="flex w-full items-center justify-between rounded-xl border border-red-100 bg-white/80 px-4 py-3 text-sm font-semibold text-red-600 shadow-sm hover:border-red-200 hover:bg-red-50 dark:border-red-400/30 dark:bg-white/5 dark:text-red-200"
-                >
-                    <span>Logout</span>
-                    <LogOut size={18} />
-                </button>
-            </div>
+            <LogoutButton onLogout={logout} />
         </div>
     );
 
     return (
         <>
-            <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-emerald-900/10 bg-white/95 text-gray-900 shadow-lg backdrop-blur lg:flex dark:border-white/10 dark:bg-[#0B0F0C] dark:text-white">
+            {/* Floating Desktop Toggle Button */}
+            <button
+                onClick={() => setIsDesktopOpen(true)}
+                className={`fixed top-4 left-4 z-40 hidden h-12 w-12 items-center justify-center rounded-2xl bg-white text-gray-600 shadow-xl border border-gray-100 hover:bg-gray-50 hover:text-emerald-600 transition-all duration-300 dark:bg-[#0B0F0C] dark:text-gray-300 dark:border-white/10 dark:hover:text-emerald-400 lg:flex ${!isDesktopOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}`}
+                aria-label="Open sidebar"
+            >
+                <Menu size={24} />
+            </button>
+
+            {/* Desktop Sidebar */}
+            <aside className={`fixed inset-y-0 left-0 z-40 hidden ${SIDEBAR_WIDTH} bg-white text-gray-900 shadow-[2px_0_12px_rgba(0,0,0,0.04)] lg:flex dark:bg-[#0B0F0C] dark:text-white dark:shadow-[2px_0_12px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-in-out ${isDesktopOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                {/* Close Button Desktop */}
+                <button
+                    onClick={() => setIsDesktopOpen(false)}
+                    className={`absolute -right-10 top-6 z-50 flex h-8 w-8 items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm text-gray-500 hover:bg-gray-50 hover:text-emerald-600 transition-all duration-300 dark:bg-[#0B0F0C] dark:border-white/10 dark:text-gray-400 dark:hover:text-white dark:hover:bg-white/10 ${!isDesktopOpen ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100'}`}
+                    aria-label="Hide sidebar"
+                >
+                    <X size={16} />
+                </button>
                 {SidebarContent}
             </aside>
 
+            {/* Mobile Toggle Button */}
             <button
                 onClick={() => setOpen(true)}
-                className="fixed bottom-6 left-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg lg:hidden"
+                className="fixed bottom-6 left-6 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-2xl shadow-emerald-600/40 hover:scale-110 active:scale-95 transition-all duration-200 lg:hidden"
                 aria-label="Open sidebar"
             >
-                <Menu size={20} />
+                <Menu size={24} />
             </button>
 
-            {open && (
-                <div className="fixed inset-0 z-50 flex lg:hidden">
-                    <div className="flex-1 bg-black/60" onClick={() => setOpen(false)} />
-                    <aside className="relative h-full w-72 bg-white/95 text-gray-900 shadow-2xl dark:bg-[#0B0F0C] dark:text-white">
-                        {SidebarContent}
-                    </aside>
-                </div>
-            )}
+            {/* Mobile Overlay Sidebar */}
+            <div
+                className={`fixed inset-0 z-[60] lg:hidden transition-all duration-300 ${open ? 'visible' : 'invisible pointer-events-none'}`}
+            >
+                {/* Backdrop */}
+                <div
+                    className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
+                    onClick={() => setOpen(false)}
+                />
+
+                {/* Sidebar Panel */}
+                <aside
+                    className={`relative h-full ${SIDEBAR_WIDTH} bg-white text-gray-900 shadow-2xl transition-transform duration-300 ease-out dark:bg-[#0B0F0C] dark:text-white ${open ? 'translate-x-0' : '-translate-x-full'}`}
+                >
+                    {/* Close Button */}
+                    <button
+                        onClick={() => setOpen(false)}
+                        className="absolute right-3 top-3 z-50 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all dark:hover:bg-white/10 dark:hover:text-white"
+                        aria-label="Close sidebar"
+                    >
+                        <X size={18} />
+                    </button>
+                    {SidebarContent}
+                </aside>
+            </div>
         </>
     );
 };

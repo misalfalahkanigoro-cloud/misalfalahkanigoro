@@ -133,7 +133,7 @@ const AkunAdminPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-[#0B0F0C] dark:text-white">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80">
+            <main className="min-h-screen px-6 py-10 lg:pl-64">
                 <section className="mx-auto max-w-3xl rounded-3xl border border-emerald-900/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
                     <p className="text-xs uppercase tracking-[0.3em] text-emerald-600 dark:text-emerald-400">Akun</p>
                     <h1 className="mt-2 text-2xl font-bold">Profil</h1>

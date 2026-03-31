@@ -1,63 +1,62 @@
-import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
-import React from 'react';
+import { NextRequest, NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
-import PPDBPdfDocument from '@/components/ppdb/PPDBPdfDocument';
+import prisma from '@/lib/prisma';
+import { mapPpdbRegistration } from '@/lib/ppdb-mapper';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { createPpdbPdfElement } from '@/lib/ppdb-pdf';
+import { getCachedSiteSettings } from '@/lib/cache-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { id } = await params;
-        const { data: registration, error } = await dbAdmin()
-            .from('ppdb_registrations')
-            .select('*')
-            .eq('id', id)
-            .maybeSingle();
 
-        if (error) throw error;
+        const registration = await prisma.ppdb_registrations.findUnique({
+            where: { id },
+        });
+
         if (!registration) {
             return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
         }
 
-        const { data: files, error: filesError } = await dbAdmin()
-            .from('ppdb_files')
-            .select('*')
-            .eq('registration_id', id)
-            .order('created_at', { ascending: true });
+        const files = await prisma.ppdb_files.findMany({
+            where: { registration_id: id },
+            orderBy: [{ created_at: 'asc' }],
+        });
 
-        if (filesError) throw filesError;
+        const [siteSettings, requirements] = await Promise.all([
+            getCachedSiteSettings(),
+            registration.wave_id
+                ? prisma.ppdb_document_requirements.findMany({
+                      where: { wave_id: registration.wave_id },
+                      orderBy: [{ created_at: 'asc' }],
+                  })
+                : Promise.resolve([]),
+        ]);
 
-        const mapped = {
-            id: registration.id,
-            namaLengkap: registration.namaLengkap,
-            nik: registration.nik,
-            nisn: registration.nisn,
-            tempatLahir: registration.tempatLahir,
-            tanggalLahir: registration.tanggalLahir,
-            jenisKelamin: registration.jenisKelamin,
-            alamat: registration.alamat,
-            namaAyah: registration.namaAyah,
-            pekerjaanAyah: registration.pekerjaanAyah,
-            namaIbu: registration.namaIbu,
-            pekerjaanIbu: registration.pekerjaanIbu,
-            noHp: registration.noHp,
-            status: registration.status,
-            pesan: registration.pesan,
-            tanggalDaftar: registration.tanggalDaftar,
-            createdAt: registration.createdAt,
-            updatedAt: registration.updatedAt,
-            files: (files || []).map((file: any) => ({
-                id: file.id,
-                registrationId: file.registration_id,
-                fileType: file.file_type,
-                fileUrl: file.file_url,
-                createdAt: file.created_at,
-            })),
-        };
+        const mapped = mapPpdbRegistration(
+            registration as unknown as Record<string, any>,
+            files as unknown as Array<Record<string, any>>
+        );
 
-        const element = React.createElement(PPDBPdfDocument, { data: mapped as any }) as any;
+        const dynamicFileLabels = Object.fromEntries(
+            (requirements || [])
+                .filter((item) => Boolean(item.key))
+                .map((item) => [String(item.key), String(item.label || item.key)])
+        );
+
+        const element = createPpdbPdfElement(mapped as any, {
+            schoolName: siteSettings?.school_name || siteSettings?.site_title || 'Sekolah',
+            subtitle: 'Bukti pendaftaran dan data calon peserta didik.',
+            fileLabels: dynamicFileLabels,
+        });
         const pdfBuffer = await renderToBuffer(element);
         const filename = `ppdb-${String(mapped.nisn || mapped.namaLengkap || 'formulir').replace(/\s+/g, '-').toLowerCase()}.pdf`;
 
@@ -65,7 +64,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         return new NextResponse(body as any, {
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename=\"${filename}\"`,
+                'Content-Disposition': `attachment; filename="${filename}"`,
             },
         });
     } catch (error) {

@@ -114,14 +114,23 @@ const Downloads: React.FC = () => {
                                                             {new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                         </span>
                                                     </div>
-                                                    <a
-                                                        href={href}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 group-hover:shadow-emerald-600/40 w-full justify-center"
-                                                    >
-                                                        <DownloadIcon size={14} /> Download
-                                                    </a>
+                                                    {href && href !== '#' ? (
+                                                        <a
+                                                            href={href}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-2 text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 group-hover:shadow-emerald-600/40 w-full justify-center"
+                                                        >
+                                                            <DownloadIcon size={14} /> Download
+                                                        </a>
+                                                    ) : (
+                                                        <button
+                                                            disabled
+                                                            className="inline-flex items-center gap-2 text-gray-400 bg-gray-100 dark:bg-white/5 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest cursor-not-allowed w-full justify-center"
+                                                        >
+                                                            <FileText size={14} /> Berkas tidak tersedia
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );

@@ -1,7 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { dbAdmin } from '@/lib/db';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { sanitizeEmbedHtml, sanitizePlainText } from '@/lib/rich-text';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { data: page, error } = await dbAdmin()
             .from('contact_page')
@@ -27,19 +34,24 @@ export async function GET() {
     }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const payload = await request.json();
         const pageId = 'main';
 
         const pagePayload = {
             id: pageId,
-            address: payload.address ?? '',
-            phone: payload.phone ?? null,
-            email: payload.email ?? '',
+            address: sanitizePlainText(payload.address, 500) ?? '',
+            phone: sanitizePlainText(payload.phone, 40) ?? null,
+            email: sanitizePlainText(payload.email, 160) ?? '',
             whatsappList: Array.isArray(payload.whatsappList) ? payload.whatsappList : [],
-            adminWhatsappId: payload.adminWhatsappId ?? null,
-            mapEmbedHtml: payload.mapEmbedHtml ?? '',
+            adminWhatsappId: sanitizePlainText(payload.adminWhatsappId, 120) ?? null,
+            mapEmbedHtml: sanitizeEmbedHtml(payload.mapEmbedHtml) ?? '',
         };
 
         const { error: pageError } = await dbAdmin()

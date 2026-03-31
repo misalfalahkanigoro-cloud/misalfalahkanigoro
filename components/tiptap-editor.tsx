@@ -56,7 +56,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         },
         editorProps: {
             attributes: {
-                class: 'prose prose-sm max-w-none focus:outline-none min-h-[' + minHeight + '] p-4',
+                class: 'prose prose-sm max-w-none focus:outline-none p-4',
+                style: `min-height: ${minHeight};`,
             },
         },
     });
@@ -100,9 +101,9 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     };
 
     return (
-        <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-white/5">
+        <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-white/5" >
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+            < div className="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5" >
                 <button
                     type="button"
                     onClick={() => editor.chain().focus().toggleBold().run()}
@@ -240,14 +241,14 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
                 >
                     <Redo size={18} />
                 </button>
-            </div>
+            </div >
 
             {/* Editor Content */}
-            <EditorContent
+            < EditorContent
                 editor={editor}
                 className="prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-a:text-emerald-600 prose-strong:text-gray-900 dark:prose-strong:text-white"
             />
-        </div>
+        </div >
     );
 };
 

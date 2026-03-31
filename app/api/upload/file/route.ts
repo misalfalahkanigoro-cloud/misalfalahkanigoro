@@ -1,76 +1,69 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import { buildStoragePath, uploadObjectToBucket } from '@/lib/r2-storage';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { validateUploadPolicy } from '@/lib/upload-policy';
+import { logError } from '@/lib/logger';
+import { checkStorageQuota, updateStorageUsage } from '@/lib/storage-quota';
 
 export async function POST(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const formData = await request.formData();
-        const file = formData.get('file') as File;
-        const bucket = formData.get('bucket') as string || 'downloads';
-        const storageProvider = 'r2';
+        const file = formData.get('file') as File | null;
+        const bucket = ((formData.get('bucket') as string) || 'downloads').trim();
+        const folder = ((formData.get('folder') as string) || '').trim();
+        const allowedBuckets = new Set(['downloads', 'publikweb']);
 
         if (!file) {
-            return NextResponse.json(
-                { error: 'No file provided' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+        }
+        if (!allowedBuckets.has(bucket)) {
+            return NextResponse.json({ error: 'Bucket tidak valid.' }, { status: 400 });
+        }
+        const validation = validateUploadPolicy(file, 'document');
+        if (!validation.ok) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
         }
 
-        // Generate unique filename
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        const buffer = Buffer.from(await file.arrayBuffer());
-
-        // Ensure bucket exists (idempotent)
-        const { data: bucketInfo, error: bucketErr } = await dbAdmin().storage.getBucket(bucket);
-        if (bucketErr || !bucketInfo) {
-            const { error: createErr } = await dbAdmin().storage.createBucket(bucket, {
-                public: true,
-                fileSizeLimit: 50 * 1024 * 1024, // 50 MB
-            });
-            if (createErr) {
-                console.error('Create bucket error:', createErr);
-                return NextResponse.json({ error: 'Failed to create bucket' }, { status: 500 });
-            }
+        // Quota check
+        const quotaCheck = await checkStorageQuota(file.size);
+        if (!quotaCheck.ok) {
+            return NextResponse.json({ error: quotaCheck.error }, { status: 403 });
         }
 
-        // Upload to R2 storage adapter
-        const { data, error } = await dbAdmin().storage
-            .from(bucket)
-            .upload(fileName, buffer, {
-                cacheControl: '3600',
-                upsert: false,
-                contentType: file.type || 'application/octet-stream',
-            });
+        const safeName = (file.name || 'upload.bin').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = buildStoragePath(folder || bucket || 'uploads', safeName);
 
-        if (error) {
-            console.error('Storage upload error:', error);
-            return NextResponse.json(
-                { error: error.message || 'Upload error' },
-                { status: 500 }
-            );
-        }
+        const metadata = await uploadObjectToBucket({
+            bucket: bucket === 'downloads' ? 'publikweb' : (bucket || 'publikweb'),
+            path,
+            file,
+            contentType: file.type || 'application/octet-stream',
+        });
 
-        // Build public/proxy URL
-        const { data: urlData } = dbAdmin().storage
-            .from(bucket)
-            .getPublicUrl(fileName);
+        // Update database quota with new file size
+        await updateStorageUsage(metadata.sizeBytes);
 
         return NextResponse.json({
             success: true,
-            url: urlData.publicUrl,
-            storageProvider,
-            storageBucket: bucket,
-            storagePath: data.path,
-            path: data.path,
+            url: metadata.url,
+            path: metadata.path,
+            fileType: metadata.mimeType,
+            fileName: metadata.fileName,
+            fileSizeKb: Math.round((metadata.sizeBytes || 0) / 1024),
+            storageProvider: metadata.provider,
+            storageBucket: metadata.bucket,
+            storagePath: metadata.path,
+            metadata,
         });
     } catch (error) {
-        console.error('Error uploading to R2:', error);
-        return NextResponse.json(
-            { error: 'Failed to upload file' },
-            { status: 500 }
-        );
+        logError('upload.file.POST', error);
+        return NextResponse.json({ error: 'Gagal upload file.' }, { status: 500 });
     }
 }

@@ -49,6 +49,44 @@ type Props = {
     data: PPDBRegistration;
 };
 
+const normalizePdfText = (value: unknown, fallback = '-'): string => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed ? trimmed : fallback;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+        return String(value);
+    }
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? fallback : value.toISOString().slice(0, 10);
+    }
+    if (Array.isArray(value)) {
+        const joined = value.map((entry) => normalizePdfText(entry, '')).filter(Boolean).join(', ');
+        return joined || fallback;
+    }
+    if (typeof value === 'object') {
+        const candidate = value as { props?: { children?: unknown } };
+        if (candidate?.props?.children !== undefined) {
+            return normalizePdfText(candidate.props.children, fallback);
+        }
+        const isoDateCandidate = 'toISOString' in (value as object) ? (value as { toISOString?: () => string }) : null;
+        if (isoDateCandidate?.toISOString) {
+            try {
+                return isoDateCandidate.toISOString().slice(0, 10);
+            } catch {
+                return fallback;
+            }
+        }
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return fallback;
+        }
+    }
+    return fallback;
+};
+
 const PPDBPdfDocument: React.FC<Props> = ({ data }) => {
     const fileLabels: Record<string, string> = {
         kk: 'Foto Kartu Keluarga (KK)',
@@ -71,30 +109,30 @@ const PPDBPdfDocument: React.FC<Props> = ({ data }) => {
 
                 <View style={styles.section}>
                     <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Data Calon Siswa</Text>
-                    <View style={styles.row}><Text style={styles.label}>Nomor Pendaftaran (NISN)</Text><Text style={styles.value}>{data.nisn || '-'}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>Nama Lengkap</Text><Text style={styles.value}>{data.namaLengkap}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>NIK</Text><Text style={styles.value}>{data.nik}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>NISN</Text><Text style={styles.value}>{data.nisn || '-'}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>Tempat, Tanggal Lahir</Text><Text style={styles.value}>{data.tempatLahir}, {data.tanggalLahir}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>Jenis Kelamin</Text><Text style={styles.value}>{data.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>Alamat</Text><Text style={styles.value}>{data.alamat}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Nomor Pendaftaran (NISN)</Text><Text style={styles.value}>{normalizePdfText(data.nisn)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Nama Lengkap</Text><Text style={styles.value}>{normalizePdfText(data.namaLengkap)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>NIK</Text><Text style={styles.value}>{normalizePdfText(data.nik)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>NISN</Text><Text style={styles.value}>{normalizePdfText(data.nisn)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Tempat, Tanggal Lahir</Text><Text style={styles.value}>{`${normalizePdfText(data.tempatLahir)}, ${normalizePdfText(data.tanggalLahir)}`}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Jenis Kelamin</Text><Text style={styles.value}>{normalizePdfText(data.jenisKelamin) === 'L' ? 'Laki-laki' : 'Perempuan'}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Alamat</Text><Text style={styles.value}>{normalizePdfText(data.alamat)}</Text></View>
                 </View>
 
                 <View style={styles.section}>
                     <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Data Orang Tua / Wali</Text>
-                    <View style={styles.row}><Text style={styles.label}>Nama Ayah</Text><Text style={styles.value}>{data.namaAyah}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>Pekerjaan Ayah</Text><Text style={styles.value}>{data.pekerjaanAyah || '-'}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>Nama Ibu</Text><Text style={styles.value}>{data.namaIbu}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>Pekerjaan Ibu</Text><Text style={styles.value}>{data.pekerjaanIbu || '-'}</Text></View>
-                    <View style={styles.row}><Text style={styles.label}>No. WhatsApp</Text><Text style={styles.value}>{data.noHp}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Nama Ayah</Text><Text style={styles.value}>{normalizePdfText(data.namaAyah)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Pekerjaan Ayah</Text><Text style={styles.value}>{normalizePdfText(data.pekerjaanAyah)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Nama Ibu</Text><Text style={styles.value}>{normalizePdfText(data.namaIbu)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Pekerjaan Ibu</Text><Text style={styles.value}>{normalizePdfText(data.pekerjaanIbu)}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>No. WhatsApp</Text><Text style={styles.value}>{normalizePdfText(data.noHp)}</Text></View>
                 </View>
 
                 <View style={styles.section}>
                     <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Berkas Terunggah</Text>
                     {(data.files || []).map((file) => (
                         <View style={styles.row} key={file.id}>
-                            <Text style={styles.label}>{fileLabels[file.fileType] || file.fileType}</Text>
-                            <Text style={styles.value}>{file.fileUrl}</Text>
+                            <Text style={styles.label}>{fileLabels[file.fileType] || normalizePdfText(file.fileType)}</Text>
+                            <Text style={styles.value}>{normalizePdfText(file.fileUrl)}</Text>
                         </View>
                     ))}
                     {(data.files || []).length === 0 && (

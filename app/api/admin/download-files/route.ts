@@ -1,114 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
+import { extractStorageIdentityFromUrl, getPublicUrl, resolveBucketName } from '@/lib/r2-storage';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { logError } from '@/lib/logger';
 
 const normalizeStoragePath = (value: string) => value.replace(/^\/+/, '').replace(/\/+$/, '');
 
-const extractStoragePathFromUrl = (value: unknown): string | null => {
-    if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-
-    try {
-        const parsed = new URL(trimmed, 'http://local');
-
-        if (parsed.pathname === '/api/storage/public') {
-            const pathParam = parsed.searchParams.get('path');
-            if (!pathParam) return null;
-            return normalizeStoragePath(decodeURIComponent(pathParam));
-        }
-
-        const segments = parsed.pathname
-            .split('/')
-            .filter(Boolean)
-            .map((segment) => decodeURIComponent(segment));
-
-        const host = parsed.hostname.toLowerCase();
-        if (host.endsWith('.r2.cloudflarestorage.com') && segments.length >= 2) {
-            return normalizeStoragePath(segments.slice(1).join('/'));
-        }
-
-        if (host.endsWith('.r2.dev') && segments.length >= 1) {
-            return normalizeStoragePath(segments.join('/'));
-        }
-    } catch {
-        return null;
+export async function GET(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    return null;
-};
-
-export async function GET() {
     try {
-        const { data, error } = await dbAdmin()
-            .from('download_files')
-            .select('*')
-            .order('display_order', { ascending: true });
+        const rows = await prisma.download_files.findMany({
+            orderBy: [{ display_order: 'asc' }],
+        });
 
-        if (error) {
-            throw error;
-        }
-
-        return NextResponse.json(data || []);
+        return NextResponse.json(rows);
     } catch (error) {
-        console.error('Admin download files error:', error);
+        logError('admin.download_files.GET', error);
         return NextResponse.json({ error: 'Failed to fetch download files' }, { status: 500 });
     }
 }
 
 export async function POST(request: NextRequest) {
+    const session = requireAdminRole(request.cookies, ['admin', 'superadmin']);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const payload = await request.json();
         const publicUrlInput = payload.publicUrl || payload.url || null;
-        const derivedPath = extractStoragePathFromUrl(publicUrlInput);
+        const storageFromUrl = extractStorageIdentityFromUrl(publicUrlInput);
         const storageProvider = payload.storageProvider || 'r2';
-        const storageBucket = payload.storageBucket || payload.bucket || 'downloads';
-        const storagePath = payload.storagePath || payload.path || derivedPath || null;
+        const storageBucket = resolveBucketName(payload.storageBucket || payload.bucket || storageFromUrl?.bucket || 'downloads', 'downloads');
+        const storagePath =
+            payload.storagePath || payload.path || storageFromUrl?.path || null;
+
+        const normalizedPath = storagePath ? normalizeStoragePath(String(storagePath)) : null;
 
         let publicUrl = publicUrlInput;
-        if (!publicUrl && storagePath) {
-            const { data: urlData } = dbAdmin().storage.from(storageBucket).getPublicUrl(storagePath);
-            publicUrl = urlData.publicUrl;
+        if (!publicUrl && normalizedPath) {
+            publicUrl = getPublicUrl(storageBucket, normalizedPath);
         }
 
         const fileName =
             payload.fileName ||
-            (typeof storagePath === 'string' && storagePath.includes('/')
-                ? storagePath.split('/').pop()
-                : storagePath) ||
+            (normalizedPath && normalizedPath.includes('/') ? normalizedPath.split('/').pop() : normalizedPath) ||
             null;
 
-        const insertPayload = {
-            download_id: payload.downloadId,
-            file_name: fileName,
-            file_type: payload.fileType,
-            file_size_kb: payload.fileSizeKb,
-            storage_provider: storageProvider,
-            storage_bucket: storageBucket,
-            storage_path: storagePath,
-            public_url: publicUrl,
-            display_order: payload.displayOrder ?? 0,
-        };
-
-        if (!insertPayload.download_id || !insertPayload.file_name || !insertPayload.storage_path) {
+        if (!payload.downloadId || !fileName || !normalizedPath) {
             return NextResponse.json(
                 { error: 'downloadId, fileName, dan storagePath wajib diisi.' },
                 { status: 400 }
             );
         }
 
-        const { data, error } = await dbAdmin()
-            .from('download_files')
-            .insert(insertPayload)
-            .select('*')
-            .single();
+        const created = await prisma.download_files.create({
+            data: {
+                download_id: payload.downloadId,
+                file_name: fileName,
+                file_type: payload.fileType || null,
+                file_size_kb: typeof payload.fileSizeKb === 'number' ? payload.fileSizeKb : null,
+                storage_provider: storageProvider,
+                storage_bucket: storageBucket,
+                storage_path: normalizedPath,
+                public_url: publicUrl,
+                display_order: typeof payload.displayOrder === 'number' ? payload.displayOrder : 0,
+            },
+        });
 
-        if (error) {
-            throw error;
-        }
-
-        return NextResponse.json(data);
+        return NextResponse.json(created);
     } catch (error) {
-        console.error('Admin download files create error:', error);
+        logError('admin.download_files.POST', error);
         return NextResponse.json({ error: 'Failed to create download file' }, { status: 500 });
     }
 }

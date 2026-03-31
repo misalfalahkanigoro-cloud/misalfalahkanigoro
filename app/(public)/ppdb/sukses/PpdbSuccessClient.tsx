@@ -3,33 +3,33 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, Download, ArrowLeft, Loader2, BellRing } from 'lucide-react';
-import type { PPDBRegistration } from '@/lib/types';
+import type { PPDBPublicSummary } from '@/lib/types';
 import type { PushSubscriptionPayload } from '@/lib/types';
 
 const PpdbSuccessClient: React.FC = () => {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const nisnParam = searchParams.get('nisn');
-    const [data, setData] = useState<PPDBRegistration | null>(null);
+    const tokenParam = searchParams.get('token');
+    const [data, setData] = useState<PPDBPublicSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [pushStatus, setPushStatus] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!nisnParam) {
-                setError('NISN tidak ditemukan.');
+            if (!tokenParam) {
+                setError('Tautan konfirmasi tidak valid atau sudah kedaluwarsa.');
                 setLoading(false);
                 return;
             }
             try {
-                const res = await fetch(`/api/ppdb/by-nisn?nisn=${encodeURIComponent(nisnParam)}`);
+                const res = await fetch(`/api/ppdb/summary?token=${encodeURIComponent(tokenParam)}`);
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
                     throw new Error(err.error || 'Gagal memuat data');
                 }
                 const json = await res.json();
-                setData(json as PPDBRegistration);
+                setData(json as PPDBPublicSummary);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Gagal memuat data');
             } finally {
@@ -38,7 +38,7 @@ const PpdbSuccessClient: React.FC = () => {
         };
 
         fetchData();
-    }, [nisnParam]);
+    }, [tokenParam]);
 
     const pdfFileName = useMemo(() => {
         if (!data) return 'ppdb-formulir.pdf';
@@ -49,7 +49,7 @@ const PpdbSuccessClient: React.FC = () => {
     const subscribeToPush = async () => {
         try {
             if (!data?.id) {
-                setPushStatus('NISN tidak ditemukan.');
+                setPushStatus('Data pendaftaran tidak ditemukan.');
                 return;
             }
             if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -83,6 +83,7 @@ const PpdbSuccessClient: React.FC = () => {
             const json = subscription.toJSON();
             const payload: PushSubscriptionPayload = {
                 registrationId: data.id,
+                accessToken: tokenParam || '',
                 endpoint: json.endpoint || '',
                 p256dh: json.keys?.p256dh || '',
                 auth: json.keys?.auth || '',
@@ -142,27 +143,27 @@ const PpdbSuccessClient: React.FC = () => {
                                 </div>
                                 <h2 className="text-2xl font-bold text-emerald-950 dark:text-white">Pendaftaran Berhasil</h2>
                                 <p className="text-sm text-emerald-900/60 dark:text-white/60 mt-2">
-                                    Simpan nomor pendaftaran Anda dan unduh formulir.
+                                    Simpan tautan halaman ini untuk melihat ringkasan pendaftaran dan unduh formulir.
                                 </p>
                             </div>
 
-                            <div className="rounded-2xl border border-dashed border-emerald-300/60 bg-emerald-50/60 p-5 text-center mb-8">
-                                <p className="text-xs uppercase tracking-widest text-emerald-600/70 mb-2">Nomor Pendaftaran</p>
-                                <p className="text-lg font-mono font-bold text-emerald-900">{data.nisn}</p>
+                            <div className="rounded-2xl border border-dashed border-emerald-300/60 bg-emerald-50/60 p-5 text-center mb-8 dark:bg-emerald-500/10 dark:border-emerald-500/30">
+                                <p className="text-xs uppercase tracking-widest text-emerald-600/70 dark:text-emerald-400/70 mb-2 font-black">Nomor Pendaftaran</p>
+                                <p className="text-lg font-mono font-bold text-emerald-900 dark:text-emerald-300">{data.id}</p>
                             </div>
 
                             <div className="grid gap-3 text-sm text-emerald-900/70 dark:text-white/70">
                                 <p><span className="font-semibold">Nama:</span> {data.namaLengkap}</p>
-                                <p><span className="font-semibold">NIK:</span> {data.nik}</p>
                                 <p><span className="font-semibold">NISN:</span> {data.nisn || '-'}</p>
                                 <p><span className="font-semibold">TTL:</span> {data.tempatLahir}, {data.tanggalLahir}</p>
-                                <p><span className="font-semibold">No. WhatsApp:</span> {data.noHp}</p>
+                                <p><span className="font-semibold">Status:</span> {data.status}</p>
+                                {data.pesan && <p><span className="font-semibold">Catatan:</span> {data.pesan}</p>}
                             </div>
 
                             <div className="mt-8 flex flex-col sm:flex-row gap-3">
                                 <a
-                                    href={`/api/ppdb/pdf?nisn=${encodeURIComponent(data.nisn || '')}`}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition"
+                                    href={`/api/ppdb/pdf?token=${encodeURIComponent(tokenParam || '')}`}
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20 active:scale-95"
                                     download={pdfFileName}
                                 >
                                     <Download size={16} />
@@ -170,14 +171,40 @@ const PpdbSuccessClient: React.FC = () => {
                                 </a>
                                 <button
                                     onClick={subscribeToPush}
-                                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600 px-5 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition"
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600 px-5 py-3 text-sm font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition"
                                 >
                                     <BellRing size={16} /> Aktifkan Notifikasi
                                 </button>
                             </div>
                             {pushStatus && (
-                                <p className="mt-3 text-xs text-emerald-700">{pushStatus}</p>
+                                <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-400 font-medium">{pushStatus}</p>
                             )}
+
+                            <div className="mt-8 pt-8 border-t border-gray-100 dark:border-white/5 space-y-8">
+                                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/5 border border-amber-100 dark:border-amber-500/20 text-amber-800 dark:text-amber-400 text-sm font-bold leading-relaxed text-center">
+                                    "Cetak formulir ini dan bawa saat tes JKD bersama berkas asli persyaratan."
+                                </div>
+
+                                <section className="space-y-4">
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-center">Pertanyaan? Hubungi panitia PPDB</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <a href="https://wa.me/6287753631037" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 hover:border-emerald-500 transition-all">
+                                            <div>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Panitia 1</p>
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">Bu Yuli</p>
+                                            </div>
+                                            <p className="text-xs font-bold text-emerald-600">0877 5363 1037</p>
+                                        </a>
+                                        <a href="https://wa.me/6285706908905" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 hover:border-emerald-500 transition-all">
+                                            <div>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Panitia 2</p>
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">Bu Nisa</p>
+                                            </div>
+                                            <p className="text-xs font-bold text-emerald-600">0857 0690 8905</p>
+                                        </a>
+                                    </div>
+                                </section>
+                            </div>
                         </>
                     ) : null}
                 </div>

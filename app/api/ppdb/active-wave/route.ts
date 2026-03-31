@@ -1,30 +1,35 @@
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
 
 export async function GET() {
     try {
-        const { data, error } = await dbAdmin()
-            .from('ppdb_waves')
-            .select('*')
-            .eq('is_active', true)
-            .order('start_date', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        const wave = await prisma.ppdb_waves.findFirst({
+            where: { is_active: true },
+            orderBy: { start_date: 'desc' },
+            include: {
+                ppdb_document_requirements: true,
+            },
+        });
 
-        if (error) throw error;
-        if (!data) {
+        if (!wave) {
             return NextResponse.json({ active: false }, { status: 200 });
         }
 
         return NextResponse.json({
             active: true,
             wave: {
-                id: data.id,
-                name: data.name,
-                startDate: data.start_date,
-                endDate: data.end_date,
-                quota: data.quota,
-                isActive: data.is_active,
+                id: wave.id,
+                name: wave.name,
+                startDate: wave.start_date,
+                endDate: wave.end_date,
+                quota: wave.quota,
+                isActive: wave.is_active,
+                documentRequirements: wave.ppdb_document_requirements.map((req: any) => ({
+                    id: req.id,
+                    label: req.label,
+                    key: req.key,
+                    isRequired: req.is_required,
+                })),
             },
         });
     } catch (error) {

@@ -1,47 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/db';
+import prisma from '@/lib/prisma';
 
-// Check PPDB status by NISN
+const isValidNisn = (value: unknown) => typeof value === 'string' && /^\d{10}$/.test(value);
+
 export async function POST(request: NextRequest) {
     try {
         const { nisn } = await request.json();
 
-        if (!nisn) {
-            return NextResponse.json(
-                { error: 'NISN is required' },
-                { status: 400 }
-            );
+        if (!isValidNisn(nisn)) {
+            return NextResponse.json({ error: 'NISN harus 10 digit angka' }, { status: 400 });
         }
 
-        const { data: registration, error } = await dbAdmin()
-            .from('ppdb_registrations')
-            .select('id, namaLengkap, tanggalDaftar, status, pesan, nisn')
-            .eq('nisn', nisn)
-            .maybeSingle();
-
-        if (error) {
-            throw error;
-        }
+        const registration = await prisma.ppdb_registrations.findFirst({
+            where: { nisn },
+            select: {
+                namaLengkap: true,
+                tanggalDaftar: true,
+                status: true,
+                pesan: true,
+                nisn: true,
+            },
+        });
 
         if (!registration) {
-            return NextResponse.json(
-                { error: 'NOT_FOUND', message: 'NISN tidak ditemukan' },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: 'NOT_FOUND', message: 'NISN tidak ditemukan' }, { status: 404 });
         }
 
         return NextResponse.json({
-            id: registration.nisn,
-            nama: registration.namaLengkap,
             tanggalDaftar: new Date(registration.tanggalDaftar).toISOString().split('T')[0],
             status: registration.status,
             pesan: registration.pesan,
+            canViewSubmission: false,
+            summaryMessage: 'Status pendaftaran ditemukan. Gunakan tautan konfirmasi yang Anda simpan untuk melihat detail berkas.',
         });
     } catch (error) {
         console.error('Error checking PPDB status:', error);
-        return NextResponse.json(
-            { error: 'Gagal mengecek status pendaftaran' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Gagal mengecek status pendaftaran' }, { status: 500 });
     }
 }

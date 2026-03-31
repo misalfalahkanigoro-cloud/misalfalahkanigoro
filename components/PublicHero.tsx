@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
-import { api } from '@/lib/api';
+import Image from 'next/image';
+import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import type { HeroItem } from '@/lib/types';
 
 const outlineBackTitle: React.CSSProperties = {
@@ -16,29 +16,14 @@ const outlineBackSoft: React.CSSProperties = {
     color: 'transparent',
 };
 
-const PublicHero: React.FC = () => {
-    const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
-    const [loading, setLoading] = useState(true);
+type PublicHeroProps = {
+    items?: HeroItem[];
+};
+
+const PublicHero: React.FC<PublicHeroProps> = ({ items = [] }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const router = useRouter();
-
-    useEffect(() => {
-        const fetchHero = async () => {
-            try {
-                // In a real app, this would fetch from /api/hero (the view_hero_section)
-                const data = await api.getHeroItems() as HeroItem[];
-                setHeroItems(data || []);
-            } catch (error) {
-                console.error('Error fetching hero items:', error);
-                // Fallback / Mock data if API is not ready or failed
-                setHeroItems([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHero();
-    }, []);
+    const heroItems = items;
 
     const nextSlide = useCallback(() => {
         if (heroItems.length <= 1) return;
@@ -79,14 +64,6 @@ const PublicHero: React.FC = () => {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="relative h-[450px] md:h-[650px] flex items-center justify-center bg-black text-white">
-                <Loader2 className="animate-spin text-emerald-400" size={48} />
-            </div>
-        );
-    }
-
     if (heroItems.length === 0) {
         // Fallback or Empty State
         return (
@@ -112,10 +89,13 @@ const PublicHero: React.FC = () => {
                     >
                         {/* Background Image - No Overlay */}
                         <div className="absolute inset-0">
-                            <img
+                            <Image
                                 src={slide.coverUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=2000'}
                                 alt={slide.title}
-                                className="w-full h-full object-cover"
+                                fill
+                                sizes="100vw"
+                                priority={index === 0}
+                                className="object-cover"
                             />
                             {/* Black bottom gradient overlay (bottom -> top) */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />

@@ -1,18 +1,19 @@
 'use client';
 
 import React from 'react';
-import { CldUploadWidget } from '@/components/r2-upload-widget';
+import { StorageUploadWidget } from '@/components/r2-upload-widget';
 import { Upload } from 'lucide-react';
 
 type Props = {
     folder?: string;
+    replaceUrl?: string; // URL file lama untuk dihapus
     label?: string;
     className?: string;
     onUploaded: (url: string, info?: any) => void;
     disabled?: boolean;
 };
 
-const MediaUploadButton: React.FC<Props> = ({ folder = 'mis-al-falah/media', label = 'Upload', className = '', onUploaded, disabled }) => {
+const MediaUploadButton: React.FC<Props> = ({ folder = 'media', replaceUrl, label = 'Upload', className = '', onUploaded, disabled }) => {
     const canUpload = !disabled;
 
     if (!canUpload) {
@@ -29,8 +30,8 @@ const MediaUploadButton: React.FC<Props> = ({ folder = 'mis-al-falah/media', lab
     }
 
     return (
-        <CldUploadWidget
-            options={{ folder }}
+        <StorageUploadWidget
+            options={{ folder, replaceUrl }}
             onSuccess={(result: any) => {
                 const info = (result as any)?.info;
                 const url = info?.secure_url || info?.url;
@@ -46,7 +47,7 @@ const MediaUploadButton: React.FC<Props> = ({ folder = 'mis-al-falah/media', lab
                     <Upload size={14} /> {label}
                 </button>
             )}
-        </CldUploadWidget>
+        </StorageUploadWidget>
     );
 };
 

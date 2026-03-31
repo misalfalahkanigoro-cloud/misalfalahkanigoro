@@ -1,7 +1,6 @@
-'use client';
-
-import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Loader2, Target } from 'lucide-react';
+import React from 'react';
+import { CheckCircle2, Target } from 'lucide-react';
+import prisma from '@/lib/prisma';
 
 type VisionMission = {
     id: string;
@@ -15,39 +14,24 @@ const splitLines = (text: string) =>
         .map((line) => line.trim())
         .filter(Boolean);
 
-const VisiMisiPage: React.FC = () => {
-    const [data, setData] = useState<VisionMission | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+const getVisionMission = async (): Promise<VisionMission | null> => {
+    const data = await prisma.vision_mission_page.findFirst({
+        where: { is_active: true },
+        orderBy: { created_at: 'desc' },
+    });
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const res = await fetch('/api/vision-mission');
-                if (res.status === 404) {
-                    setError('Visi dan misi belum tersedia.');
-                    setData(null);
-                    return;
-                }
-                if (!res.ok) {
-                    throw new Error('Gagal memuat visi dan misi');
-                }
-                const payload = await res.json();
-                setData(payload || null);
-            } catch (err) {
-                console.error(err);
-                setError('Visi dan misi belum tersedia.');
-            } finally {
-                setLoading(false);
-            }
-        };
+    if (!data) return null;
 
-        fetchData();
-    }, []);
+    return {
+        id: data.id,
+        visionText: data.vision_text,
+        missionText: data.mission_text,
+    };
+};
 
-    const missionLines = useMemo(() => splitLines(data?.missionText || ''), [data?.missionText]);
+const VisiMisiPage = async () => {
+    const data = await getVisionMission();
+    const missionLines = splitLines(data?.missionText || '');
     const showMissionList = missionLines.length > 1;
 
     return (
@@ -63,20 +47,11 @@ const VisiMisiPage: React.FC = () => {
             </section>
 
             <section className="container mx-auto px-4 py-16">
-                {loading && (
-                    <div className="rounded-3xl border border-emerald-100 bg-white/80 p-10 text-center text-sm text-emerald-900/70 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-emerald-100/70">
-                        <Loader2 className="mx-auto mb-3 animate-spin text-emerald-600" size={24} />
-                        Memuat visi dan misi...
-                    </div>
-                )}
-
-                {!loading && error && (
+                {!data ? (
                     <div className="rounded-3xl border border-dashed border-emerald-200 bg-white/80 p-10 text-center text-sm text-emerald-900/70 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-emerald-100/70">
-                        {error}
+                        Visi dan misi belum tersedia.
                     </div>
-                )}
-
-                {!loading && !error && data && (
+                ) : (
                     <div className="grid gap-8 lg:grid-cols-2">
                         <div className="rounded-3xl border border-emerald-100 bg-white/90 p-8 shadow-lg shadow-emerald-100/40 backdrop-blur dark:border-white/10 dark:bg-white/5">
                             <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-200">

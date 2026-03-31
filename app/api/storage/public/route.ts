@@ -6,13 +6,19 @@ export const runtime = 'nodejs';
 
 const DEFAULT_R2_REGION = process.env.R2_REGION || 'auto';
 
+const resolvePublikwebBucket = () =>
+    (process.env.R2_BUCKET_PUBLIKWEB || process.env.R2_DEFAULT_BUCKET || process.env.R2_BUCKET_MEDIA || 'publikweb').trim();
+
 const resolveBucketName = (bucket: string) => {
-    const normalized = (bucket || process.env.R2_DEFAULT_BUCKET || 'media').trim();
+    const normalized = (bucket || process.env.R2_DEFAULT_BUCKET || 'publikweb').trim();
     if (normalized === 'downloads') {
         return process.env.R2_BUCKET_DOWNLOADS || 'downloads';
     }
     if (normalized === 'media') {
         return process.env.R2_BUCKET_MEDIA || 'media';
+    }
+    if (normalized === 'publikweb') {
+        return resolvePublikwebBucket();
     }
     return normalized;
 };
@@ -64,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const bucket = resolveBucketName(searchParams.get('bucket') || 'media');
+    const bucket = resolveBucketName(searchParams.get('bucket') || 'publikweb');
     const path = (searchParams.get('path') || '').replace(/^\/+/, '');
 
     if (!path) {
@@ -95,6 +101,12 @@ export async function GET(request: NextRequest) {
         }
         if (object.LastModified) {
             headers.set('Last-Modified', object.LastModified.toUTCString());
+        }
+
+        // Force download if requested
+        if (searchParams.get('download') === '1') {
+            const fileName = path.split('/').pop() || 'download';
+            headers.set('Content-Disposition', `attachment; filename="${fileName}"`);
         }
 
         return new NextResponse(stream, { status: 200, headers });

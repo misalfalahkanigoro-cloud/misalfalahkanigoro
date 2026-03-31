@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useState } from 'react';
 
 type UploadOptions = {
     folder?: string;
+    replaceUrl?: string;
     resourceType?: string;
     sources?: string[];
     clientAllowedFormats?: string[];
@@ -27,7 +28,8 @@ type UploadErrorPayload = {
     };
 };
 
-type CldUploadWidgetProps = {
+type StorageUploadWidgetProps = {
+    endpoint?: string;
     uploadPreset?: string;
     options?: UploadOptions;
     onSuccess?: (result: UploadSuccessPayload) => void;
@@ -57,7 +59,8 @@ const normalizeFolder = (folder?: string) => {
     return raw || 'general';
 };
 
-export const CldUploadWidget: React.FC<CldUploadWidgetProps> = ({
+export const StorageUploadWidget: React.FC<StorageUploadWidgetProps> = ({
+    endpoint = '/api/upload/media',
     options,
     onSuccess,
     onError,
@@ -86,8 +89,11 @@ export const CldUploadWidget: React.FC<CldUploadWidgetProps> = ({
         const formData = new FormData();
         formData.append('file', file);
         formData.append('folder', folder);
+        if (options?.replaceUrl) {
+            formData.append('replaceUrl', options.replaceUrl);
+        }
 
-        const response = await fetch('/api/upload/media', {
+        const response = await fetch(endpoint, {
             method: 'POST',
             body: formData,
         });
@@ -149,4 +155,7 @@ export const CldUploadWidget: React.FC<CldUploadWidgetProps> = ({
     );
 };
 
-export default CldUploadWidget;
+// Temporary alias for backward compatibility during migration.
+export const CldUploadWidget = StorageUploadWidget;
+
+export default StorageUploadWidget;

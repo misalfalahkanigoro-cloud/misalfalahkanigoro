@@ -1,351 +1,245 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BarChart3, Globe, MessageCircle, RefreshCcw, Share2, ShieldAlert, Sparkles, SlidersHorizontal, Settings2, Info, CheckCircle2 } from 'lucide-react';
 import SidebarAdmin from '@/components/sidebar-admin';
-import {
-    ArrowUp,
-    ChevronRight,
-    Database,
-    File,
-    Folder,
-    RefreshCcw,
-    Trash2,
-} from 'lucide-react';
+import HeaderAdmin from '@/components/header-admin';
+import IdentitySettingsTab from '@/components/admin/settings/IdentitySettingsTab';
+import SeoSettingsTab from '@/components/admin/settings/SeoSettingsTab';
+import SocialSettingsTab from '@/components/admin/settings/SocialSettingsTab';
+import WhatsappSettingsTab from '@/components/admin/settings/WhatsappSettingsTab';
+import SettingsSidebarPanel from '@/components/admin/settings/SettingsSidebarPanel';
+import { useSettings } from '@/lib/hooks/use-settings';
 
-type StorageBucket = {
-    id?: string;
-    name: string;
-    public?: boolean;
+const TAB_ICONS = {
+    identity: Globe,
+    whatsapp: MessageCircle,
+    social: Share2,
+    seo: BarChart3,
 };
 
-type StorageItem = {
-    name: string;
-    path: string;
-    isFolder: boolean;
-    size: number;
-    updatedAt: string | null;
-    createdAt: string | null;
-    lastAccessedAt: string | null;
+const TAB_DESCS = {
+    identity: 'Logo, nama, dan metadata dasar',
+    whatsapp: 'Integrasi chat dan notifikasi',
+    social: 'Link platform dan profil publik',
+    seo: 'Optimasi pencarian dan tracking',
 };
 
-type StorageUsage = {
-    totalBytes: number;
-    totalFiles: number;
-    totalFolders: number;
-};
+function SettingsContent() {
+    const {
+        role,
+        activeTab,
+        setActiveTab,
+        settings,
+        loading,
+        saving,
+        error,
+        handleSave,
+        tabs
+    } = useSettings();
 
-const formatBytes = (bytes: number) => {
-    if (!bytes) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-    const value = bytes / Math.pow(1024, index);
-    return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
-};
+    const displayTabs = tabs.map(tab => ({
+        ...tab,
+        icon: TAB_ICONS[tab.id as keyof typeof TAB_ICONS],
+        desc: TAB_DESCS[tab.id as keyof typeof TAB_DESCS],
+    }));
 
-const StorageSettingsPage: React.FC = () => {
-    const [role, setRole] = useState<string | null>(null);
-
-    useEffect(() => {
-        const stored = localStorage.getItem('adminUser');
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored) as { role?: string };
-                setRole(parsed.role || null);
-            } catch {
-                setRole(null);
-            }
-        }
-    }, []);
-
-    return (
-        <div className="min-h-screen bg-gray-100 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
-            <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80 space-y-8">
-                <div className="rounded-3xl border border-emerald-900/20 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-white/5">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <p className="text-xs uppercase tracking-[0.3em] text-emerald-600/80">File Manager</p>
-                            <h1 className="mt-2 text-2xl font-semibold">File Manager</h1>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
-                                Kelola isi storage R2 aktif (via adapter), termasuk direktori dan pemakaian storage.
-                            </p>
-                        </div>
-                        <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
-                            <Database size={16} /> Storage Aktif
-                        </div>
+    if (loading) {
+        return (
+            <div className="flex flex-col min-h-screen items-center justify-center bg-[#F8FAFC] dark:bg-[#080B09] transition-colors font-sans">
+                <div className="relative">
+                    {/* Pulsing ambient rings */}
+                    <motion.div 
+                        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
+                        transition={{ duration: 3, repeat: Infinity }}
+                        className="absolute inset-0 -m-8 border-4 border-emerald-500/10 rounded-full blur-xl"
+                    ></motion.div>
+                    
+                    <div className="w-24 h-24 border-4 border-emerald-500/10 rounded-full"></div>
+                    <div className="w-24 h-24 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0 shadow-[0_0_15px_rgba(16,185,129,0.3)]"></div>
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/20 backdrop-blur-sm rounded-full">
+                        <Settings2 size={28} className="text-emerald-500 animate-pulse transition-transform duration-1000 rotate-180" />
                     </div>
                 </div>
+                <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-10 text-center"
+                >
+                    <p className="text-[12px] font-black uppercase tracking-[0.5em] text-emerald-600 dark:text-emerald-400 mb-2">Pusat Kendali</p>
+                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-widest italic">Inisialisasi Parameter Global...</p>
+                </motion.div>
+            </div>
+        );
+    }
 
-                {role && role !== 'superadmin' ? (
-                    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-100">
-                        Halaman ini hanya bisa diakses oleh superadmin.
-                    </div>
-                ) : (
-                    <StorageManager />
-                )}
+    return (
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#080B09] text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
+            <SidebarAdmin />
+            <main className="min-h-screen lg:pl-64 pb-24">
+                <HeaderAdmin 
+                    title="Control Center"
+                    subtitle="Manajemen parameter global, kebijakan visual, dan optimasi digital MI Alfalah"
+                    action={
+                        <div className="bg-emerald-500/10 dark:bg-emerald-500/10 px-8 py-3 rounded-2xl flex items-center gap-4 border border-emerald-500/20 shadow-inner group overflow-hidden relative">
+                            <div className="absolute inset-0 bg-emerald-500/5 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                            <Sparkles size={18} className="text-emerald-600 animate-pulse" />
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-400 tracking-[0.2em] uppercase leading-none mb-1">Authenticated</span>
+                                <span className="text-[8px] font-black text-emerald-500/60 tracking-widest uppercase leading-none italic">Control Hub Access</span>
+                            </div>
+                        </div>
+                    }
+                />
+
+                <section className="px-4 sm:px-10 mt-12">
+                    {role && role !== 'superadmin' ? (
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="max-w-4xl mx-auto mt-20 p-16 bg-white/70 dark:bg-[#151b18]/80 backdrop-blur-3xl rounded-[4rem] border border-white dark:border-white/10 shadow-3xl text-center relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 blur-[100px] -translate-y-32 translate-x-32" />
+                            <div className="relative z-10">
+                                <div className="w-24 h-24 bg-red-50 dark:bg-red-500/10 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 text-red-500 shadow-xl shadow-red-500/10 ring-4 ring-red-500/5">
+                                    <ShieldAlert size={48} />
+                                </div>
+                                <h2 className="text-3xl font-black font-fraunces text-gray-950 dark:text-white uppercase tracking-tight mb-6">Protokol Keamanan Aktif</h2>
+                                <p className="text-gray-500 dark:text-gray-400 font-bold max-w-sm mx-auto uppercase tracking-widest text-xs leading-relaxed italic border-y border-gray-100 dark:border-white/5 py-4">
+                                    Akses ke Control Center dibatasi hanya untuk otoritas tingkat tinggi (SUPERADMIN).
+                                </p>
+                                <button onClick={() => window.history.back()} className="mt-12 px-10 py-5 bg-gray-950 dark:bg-white text-white dark:text-black rounded-[1.75rem] text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl">
+                                    TERMINATE & RETURN
+                                </button>
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <div className="grid lg:grid-cols-12 gap-12 items-start max-w-7xl mx-auto">
+                            <SettingsSidebarPanel
+                                tabs={displayTabs}
+                                activeTab={activeTab}
+                                onSelectTab={(tabId) => setActiveTab(tabId as any)}
+                            />
+
+                            {/* Main Form Content Container */}
+                            <div className="lg:col-span-8 xl:col-span-9 space-y-12">
+                                <AnimatePresence mode="wait">
+                                    {error && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, y: -20, height: 0 }}
+                                            animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                            exit={{ opacity: 0, y: -20, height: 0 }}
+                                            className="p-8 rounded-[2.5rem] bg-red-50 dark:bg-red-500/5 border border-red-500/20 flex items-start gap-6 shadow-xl shadow-red-900/5"
+                                        >
+                                            <div className="p-3 bg-red-500 rounded-2xl text-white shadow-lg ring-4 ring-red-500/10 shrink-0 mt-0.5 animate-bounce">
+                                                <ShieldAlert size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1.5">System Constraint Detected</p>
+                                                <p className="text-sm font-black text-red-950 dark:text-red-200 leading-tight uppercase tracking-tight">{error}</p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                <motion.div 
+                                    layout
+                                    className="bg-white/70 dark:bg-[#151b18]/80 backdrop-blur-3xl rounded-[4rem] border border-white dark:border-white/10 shadow-3xl p-10 lg:p-14 min-h-[700px] relative overflow-hidden"
+                                >
+                                    {/* Glass header inside card */}
+                                    <div className="mb-14 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 border-b border-gray-100 dark:border-white/5 pb-10">
+                                        <div className="flex items-center gap-6">
+                                            <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-[1.75rem] text-emerald-600 shadow-inner">
+                                                {activeTab === 'identity' && <Globe size={28} />}
+                                                {activeTab === 'whatsapp' && <MessageCircle size={28} />}
+                                                {activeTab === 'social' && <Share2 size={28} />}
+                                                {activeTab === 'seo' && <BarChart3 size={28} />}
+                                            </div>
+                                            <div>
+                                                <h2 className="text-2xl font-black font-fraunces text-gray-950 dark:text-white uppercase tracking-tight leading-none mb-2">
+                                                    {tabs.find(t => t.id === activeTab)?.label}
+                                                </h2>
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] italic">
+                                                    MASTER DATA SEGMENT: {activeTab.toUpperCase()}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {saving && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, x: 20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: 20 }}
+                                                    className="flex items-center gap-4 bg-emerald-600/90 text-white px-8 py-3.5 rounded-[1.5rem] shadow-xl shadow-emerald-600/30 backdrop-blur-xl border border-white/20"
+                                                >
+                                                    <RefreshCcw size={16} className="animate-spin" />
+                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Synchronizing...</span>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+
+                                    <div className="relative">
+                                        <AnimatePresence mode="wait">
+                                            <motion.div
+                                                key={activeTab}
+                                                initial={{ opacity: 0, x: 10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: -10 }}
+                                                transition={{ duration: 0.5, ease: "easeOut" }}
+                                            >
+                                                {activeTab === 'identity' && <IdentitySettingsTab settings={settings} onSave={handleSave} saving={saving} />}
+                                                {activeTab === 'whatsapp' && <WhatsappSettingsTab settings={settings} onSave={handleSave} saving={saving} />}
+                                                {activeTab === 'social' && <SocialSettingsTab settings={settings} onSave={handleSave} saving={saving} />}
+                                                {activeTab === 'seo' && <SeoSettingsTab settings={settings} onSave={handleSave} saving={saving} />}
+                                            </motion.div>
+                                        </AnimatePresence>
+                                    </div>
+
+                                    {/* Footer Advisory inside main card */}
+                                    <div className="mt-14 p-8 bg-gray-50/50 dark:bg-black/20 rounded-[2.5rem] border border-gray-100 dark:border-white/5 flex gap-6 items-center">
+                                        <div className="p-3 bg-white dark:bg-white/5 rounded-2xl text-gray-400 shadow-sm"><Info size={20}/></div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1.5 leading-none italic">Configuration advisory</p>
+                                            <p className="text-[11px] font-bold text-gray-400/80 leading-relaxed uppercase tracking-widest">
+                                                Setiap perubahan parameter pada segmen ini akan direfleksikan secara instan ke seluruh sistem front-facing MI Alfalah.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        </div>
+                    )}
+                </section>
+
+                {/* GLOBAL SUCCESS TOAST (Optional extension) */}
+                <AnimatePresence>
+                    {!saving && !error && !loading && (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="hidden" // Just logic for now
+                        />
+                    )}
+                </AnimatePresence>
             </main>
         </div>
     );
-};
+}
 
-const StorageManager: React.FC = () => {
-    const [buckets, setBuckets] = useState<StorageBucket[]>([]);
-    const [bucket, setBucket] = useState('');
-    const [prefix, setPrefix] = useState('');
-    const [items, setItems] = useState<StorageItem[]>([]);
-    const [usage, setUsage] = useState<StorageUsage | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [usageLoading, setUsageLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [nextOffset, setNextOffset] = useState<number | null>(null);
-
-    const loadBuckets = useCallback(async () => {
-        try {
-            const res = await fetch('/api/admin/storage?listBuckets=1');
-            if (!res.ok) throw new Error('Gagal memuat bucket');
-            const json = await res.json();
-            const list = Array.isArray(json.buckets) ? (json.buckets as StorageBucket[]) : [];
-            setBuckets(list);
-            if (!bucket && list[0]?.name) {
-                setBucket(list[0].name);
-            }
-        } catch (err: any) {
-            setError(err.message || 'Gagal memuat bucket');
-        }
-    }, [bucket]);
-
-    const loadItems = useCallback(async () => {
-        if (!bucket) return;
-        setLoading(true);
-        setError(null);
-        try {
-            const query = new URLSearchParams({
-                bucket,
-                prefix,
-                limit: '200',
-            });
-            const res = await fetch(`/api/admin/storage?${query.toString()}`);
-            if (!res.ok) throw new Error('Gagal memuat file');
-            const json = await res.json();
-            setItems(Array.isArray(json.items) ? json.items : []);
-            setNextOffset(typeof json.nextOffset === 'number' ? json.nextOffset : null);
-        } catch (err: any) {
-            setError(err.message || 'Gagal memuat file');
-        } finally {
-            setLoading(false);
-        }
-    }, [bucket, prefix]);
-
-    const refreshUsage = useCallback(async () => {
-        if (!bucket) return;
-        setUsageLoading(true);
-        try {
-            const query = new URLSearchParams({ bucket, includeUsage: '1' });
-            const res = await fetch(`/api/admin/storage?${query.toString()}`);
-            if (!res.ok) throw new Error('Gagal menghitung usage');
-            const json = await res.json();
-            setUsage(json.usage || null);
-        } catch (err: any) {
-            setError(err.message || 'Gagal menghitung usage');
-        } finally {
-            setUsageLoading(false);
-        }
-    }, [bucket]);
-
-    useEffect(() => {
-        loadBuckets();
-    }, [loadBuckets]);
-
-    useEffect(() => {
-        loadItems();
-    }, [loadItems]);
-
-    const breadcrumbItems = useMemo(() => (prefix ? prefix.split('/') : []), [prefix]);
-
-    const handleDelete = async (item: StorageItem) => {
-        if (!bucket) return;
-        const confirmText = item.isFolder
-            ? `Hapus folder \"${item.name}\" beserta seluruh isinya?`
-            : `Hapus file \"${item.name}\"?`;
-        if (!window.confirm(confirmText)) return;
-        try {
-            const res = await fetch('/api/admin/storage', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    bucket,
-                    path: item.path,
-                    isFolder: item.isFolder,
-                }),
-            });
-            if (!res.ok) {
-                const json = await res.json().catch(() => ({}));
-                throw new Error(json.error || 'Gagal menghapus');
-            }
-            loadItems();
-            refreshUsage();
-        } catch (err: any) {
-            setError(err.message || 'Gagal menghapus');
-        }
-    };
-
-    const quotaGb = Number(process.env.NEXT_PUBLIC_STORAGE_QUOTA_GB || process.env.NEXT_PUBLIC_SUPABASE_STORAGE_QUOTA_GB || '');
-    const quotaBytes = quotaGb > 0 ? quotaGb * 1024 * 1024 * 1024 : null;
-    const usedBytes = usage?.totalBytes ?? 0;
-    const usedPercent = quotaBytes ? Math.min((usedBytes / quotaBytes) * 100, 100) : null;
-
+export default function SettingsPage() {
     return (
-        <div className="space-y-6">
-            <div className="rounded-3xl border border-emerald-900/20 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <h2 className="text-lg font-semibold">Storage Aktif (R2)</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-300">Kelola bucket dan file yang tersimpan di storage aktif.</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            onClick={refreshUsage}
-                            className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-600"
-                        >
-                            <RefreshCcw size={14} /> {usageLoading ? 'Menghitung...' : 'Hitung Usage'}
-                        </button>
-                        <button
-                            onClick={loadItems}
-                            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600"
-                        >
-                            <RefreshCcw size={14} /> Refresh
-                        </button>
-                    </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                    <div className="md:col-span-2">
-                        <label className="text-xs font-semibold text-gray-500">Bucket</label>
-                        <select
-                            value={bucket}
-                            onChange={(e) => {
-                                setBucket(e.target.value);
-                                setPrefix('');
-                            }}
-                            className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-black/30"
-                        >
-                            {buckets.length === 0 && <option value="">Tidak ada bucket</option>}
-                            {buckets.map((b) => (
-                                <option key={b.name} value={b.name}>
-                                    {b.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="rounded-2xl border border-emerald-900/10 bg-emerald-50/70 p-4 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-xs font-semibold text-emerald-600">Pemakaian Storage</p>
-                        <p className="mt-2 text-lg font-bold text-emerald-900 dark:text-white">{formatBytes(usedBytes)}</p>
-                        {usedPercent !== null ? (
-                            <div className="mt-3">
-                                <div className="h-2 w-full rounded-full bg-emerald-100">
-                                    <div
-                                        className="h-2 rounded-full bg-emerald-500"
-                                        style={{ width: `${usedPercent.toFixed(1)}%` }}
-                                    />
-                                </div>
-                                <p className="mt-1 text-[11px] text-emerald-700">
-                                    {usedPercent.toFixed(1)}% dari {quotaGb} GB
-                                </p>
-                            </div>
-                        ) : (
-                            <p className="mt-2 text-[11px] text-emerald-700">
-                                Set `NEXT_PUBLIC_STORAGE_QUOTA_GB` di `.env` untuk persentase.
-                            </p>
-                        )}
-                        {usage && (
-                            <p className="mt-2 text-[11px] text-emerald-700">
-                                {usage.totalFiles} file, {usage.totalFolders} folder
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                <div className="mt-6 flex items-center gap-2 text-xs text-gray-500">
-                    <button
-                        onClick={() => {
-                            if (breadcrumbItems.length === 0) return;
-                            const nextPrefix = breadcrumbItems.slice(0, -1).join('/');
-                            setPrefix(nextPrefix);
-                        }}
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] text-gray-600"
-                    >
-                        <ArrowUp size={12} /> Up
-                    </button>
-                    <span className="font-semibold">Bucket Root</span>
-                    {breadcrumbItems.map((segment, idx) => (
-                        <button
-                            key={`${segment}-${idx}`}
-                            onClick={() => setPrefix(breadcrumbItems.slice(0, idx + 1).join('/'))}
-                            className="inline-flex items-center gap-1 rounded-lg border border-transparent px-1 py-0.5 text-[11px] text-emerald-700 hover:border-emerald-100"
-                        >
-                            <ChevronRight size={12} /> {segment}
-                        </button>
-                    ))}
+        <React.Suspense fallback={
+            <div className="flex flex-col min-h-screen items-center justify-center bg-[#F8FAFC] dark:bg-[#080B09]">
+                <div className="relative">
+                    <div className="w-24 h-24 border-4 border-emerald-500/10 rounded-full"></div>
+                    <div className="w-24 h-24 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
                 </div>
             </div>
-
-            {error && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                    {error}
-                </div>
-            )}
-
-            <div className="rounded-3xl border border-emerald-900/20 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Daftar File</h3>
-                    {loading && <span className="text-xs text-emerald-600">Memuat...</span>}
-                </div>
-                {items.length === 0 && !loading && (
-                    <div className="mt-4 rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
-                        Folder kosong.
-                    </div>
-                )}
-                <div className="mt-4 space-y-3">
-                    {items.map((item) => (
-                        <div
-                            key={item.path}
-                            className="flex flex-col gap-3 rounded-2xl border border-emerald-900/10 bg-white/80 p-4 dark:border-white/10 dark:bg-white/5 md:flex-row md:items-center md:justify-between"
-                        >
-                            <div className="flex items-start gap-3">
-                                <div className={`mt-0.5 rounded-xl p-2 ${item.isFolder ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                                    {item.isFolder ? <Folder size={18} /> : <File size={18} />}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.name}</p>
-                                    <p className="text-[11px] text-gray-500">{item.path}</p>
-                                    <p className="text-[11px] text-gray-400">{item.isFolder ? 'Folder' : formatBytes(item.size)}</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                {item.isFolder && (
-                                    <button
-                                        onClick={() => setPrefix(item.path)}
-                                        className="rounded-lg border border-emerald-600 px-3 py-1 text-xs text-emerald-600"
-                                    >
-                                        Buka
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => handleDelete(item)}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1 text-xs text-red-500"
-                                >
-                                    <Trash2 size={12} /> Hapus
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                {nextOffset !== null && (
-                    <p className="mt-4 text-xs text-amber-600">Masih ada data lain. Persempit prefix untuk melihat lebih lanjut.</p>
-                )}
-            </div>
-        </div>
+        }>
+            <SettingsContent />
+        </React.Suspense>
     );
-};
-
-export default StorageSettingsPage;
+}

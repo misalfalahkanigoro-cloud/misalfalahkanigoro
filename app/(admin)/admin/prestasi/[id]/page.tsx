@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Trash2, Trophy } from 'lucide-react';
 import SidebarAdmin from '@/components/sidebar-admin';
-import { api } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 import type { Achievement, AchievementLevel } from '@/lib/types';
 import MediaUploadButton from '@/components/admin/MediaUploadButton';
 import MediaManager, { MediaForm } from '@/components/admin/MediaManager';
@@ -23,7 +23,7 @@ const AdminAchievementEditPage: React.FC = () => {
         rank: '',
         description: '',
         achievedAt: new Date().toISOString().split('T')[0],
-        isPublished: true,
+        is_published: true,
         isPinned: false,
         coverUrl: '',
         media: [],
@@ -40,7 +40,7 @@ const AdminAchievementEditPage: React.FC = () => {
         if (!isNew && id) {
             const fetchData = async () => {
                 try {
-                    const res = await api.getAchievementDetail(id);
+                    const res = await adminApi.getAchievementDetail(id);
                     if (res) {
                         setForm({
                             ...res,
@@ -96,9 +96,9 @@ const AdminAchievementEditPage: React.FC = () => {
             };
 
             if (isNew) {
-                await api.createAchievement(payload as any);
+                await adminApi.createAchievement(payload as any);
             } else {
-                await api.updateAchievement(id, payload as any);
+                await adminApi.updateAchievement(id, payload as any);
             }
             router.push('/admin/prestasi');
             router.refresh();
@@ -154,7 +154,7 @@ const AdminAchievementEditPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 transition-colors dark:bg-[#0B0F0C] dark:text-gray-100">
             <SidebarAdmin />
-            <main className="min-h-screen px-6 py-10 lg:pl-80 space-y-8">
+            <main className="min-h-screen px-6 py-10 lg:pl-64 space-y-8">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-4">
                         <button
@@ -273,8 +273,8 @@ const AdminAchievementEditPage: React.FC = () => {
                                 <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/10 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition mb-2">
                                     <input
                                         type="checkbox"
-                                        checked={form.isPublished}
-                                        onChange={e => setForm({ ...form, isPublished: e.target.checked })}
+                                        checked={form.is_published}
+                                        onChange={e => setForm({ ...form, is_published: e.target.checked })}
                                         className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300"
                                     />
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Publikasikan</span>
@@ -323,7 +323,7 @@ const AdminAchievementEditPage: React.FC = () => {
                                 )}
 
                                 <MediaUploadButton
-                                    folder="mis-al-falah/achievements"
+                                    folder="mi-mh-02/achievements"
                                     label={uploading ? 'Uploading...' : 'Upload Cover'}
                                     onUploaded={handleCoverUpload}
                                     className={uploading ? 'opacity-50 cursor-not-allowed' : ''}
@@ -421,4 +421,3 @@ const AdminAchievementEditPage: React.FC = () => {
 };
 
 export default AdminAchievementEditPage;
-

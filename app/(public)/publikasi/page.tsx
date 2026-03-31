@@ -127,6 +127,7 @@ const PublikasiPage: React.FC = () => {
                                 placeholder="Cari judul publikasi..."
                                 className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-white/5 border border-transparent dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-emerald-500 transition text-sm outline-none"
                             />
+                            <p className="mt-2 text-[11px] text-gray-400">Pencarian berlaku untuk daftar di halaman ini.</p>
                         </div>
                     </div>
 
